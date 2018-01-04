@@ -1,7 +1,6 @@
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 
-import java.io.BufferedReader;
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.*;
@@ -10,6 +9,10 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 
+/**
+ * An implementation of Knuth's Dancing Links algorithm from pre-fascicle 5C
+ * of TAOCP volume 4.
+ */
 public class Problem {
     private static final Splitter splitter = Splitter.on(" ").omitEmptyStrings();
 
@@ -27,6 +30,7 @@ public class Problem {
     private final INode inode0 = new INode();
     private final ArrayList<INode> inodes = Lists.newArrayList(inode0);
     private final ArrayList<XNode> xnodes = new ArrayList<>();
+    private final ArrayList<Integer> optionByNumber = new ArrayList<>();
     private int optionCount = 0;
     private Function<List<Integer>, Boolean> reporter;
     private Runnable complete;
@@ -43,6 +47,14 @@ public class Problem {
             System.out.println();
         }
         return true;
+    }
+
+    public List<String> optionIndexToItemNames(int oi) {
+        List<String> items = new ArrayList<>();
+        for (int ix = optionByNumber.get(oi); xnodes.get(ix).top > 0; ++ix) {
+            items.add(inodes.get(xnodes.get(ix).top).name);
+        }
+        return items;
     }
 
     public Problem onSolution(Function<List<Integer>, Boolean> reporter) {
@@ -107,16 +119,19 @@ public class Problem {
             xHead.len++;
             XNode x = new XNode();
             ix = xnodes.size();
-            xnodes.add(x);
             x.ulink = xHead.ulink;
             xnodes.get(xHead.ulink).dlink = ix;
             x.dlink = ixnode;
             x.top = ixnode;
             xHead.ulink = ix;
             if (rightSpacer.ulink == 0) {
+                // The first item in the new option. We take care of two small bookkeeping tasks:
                 // ULINK(x) of a spacer is the adddress of the first node in the option before x
                 rightSpacer.ulink = ix;
+                // An index from option index to first XNode in the option
+                optionByNumber.add(xnodes.size());
             }
+            xnodes.add(x);
         }
         leftSpacer.dlink = ix;
         leftSpacer.top = -optionCount;
