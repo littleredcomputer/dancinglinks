@@ -12,25 +12,13 @@ import java.util.stream.Stream;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.*;
 
-public class ProblemTest {
-
-    private List<List<Integer>> results(Problem p) {
-        List<List<Integer>> results = new ArrayList<>();
-
-        p.onSolution((s) -> {
-            results.add(s);
-            return true;
-        });
-        p.solve();
-        return results;
-    }
+public class ExactCoverProblemTest {
 
     @Test
     public void example5() {
-        Problem p = new Problem();
+        ExactCoverProblem p = new ExactCoverProblem();
         p.parse("a b c d e f g\nc e\na d g\nb c f\na d f\nb g\nd e g");
-        List<List<Integer>> r = results(p);
-        assertThat(r, is(Collections.singletonList(Arrays.asList(3, 4, 0))));
+        assertThat(p.allSolutions(), is(Collections.singletonList(Arrays.asList(3, 4, 0))));
     }
 
     private String langfordPairsInstance(int n) {
@@ -51,14 +39,14 @@ public class ProblemTest {
 
     @Test
     public void langfordPairs3() {
-        Problem p = new Problem().parse(langfordPairsInstance(3));
-        assertThat(results(p), is(Arrays.asList(Arrays.asList(1, 7, 6), Arrays.asList(2, 4, 8))));
+        ExactCoverProblem p = new ExactCoverProblem().parse(langfordPairsInstance(3));
+        assertThat(p.allSolutions(), is(Arrays.asList(Arrays.asList(1, 7, 6), Arrays.asList(2, 4, 8))));
     }
 
     @Test
     public void langfordPairs4() {
-        Problem p = new Problem().parse(langfordPairsInstance(4));
-        List<List<Integer>> r = results(p);
+        ExactCoverProblem p = new ExactCoverProblem().parse(langfordPairsInstance(4));
+        List<List<Integer>> r = p.allSolutions();
         assertThat(r, is(Arrays.asList(Arrays.asList(1, 15, 10, 13), Arrays.asList(4, 6, 12, 17))));
         Stream<List<List<String>>> solutions = r.stream().map(sol ->
                 sol.stream().map(p::optionIndexToItemNames).collect(Collectors.toList()));
@@ -79,7 +67,7 @@ public class ProblemTest {
     @Test
     public void langfordCounts() {
         List<Integer> counts = IntStream.range(2, 10)
-                .map(i -> results(new Problem().parse(langfordPairsInstance(i))).size())
+                .map(i -> new ExactCoverProblem().parse(langfordPairsInstance(i)).allSolutions().size())
                 .boxed()
                 .collect(Collectors.toList());
         assertThat(counts, is(Arrays.asList(0, 2, 2, 0, 0, 52, 300, 0)));

@@ -13,7 +13,7 @@ import java.util.stream.StreamSupport;
  * An implementation of Knuth's Dancing Links algorithm from pre-fascicle 5C
  * of TAOCP volume 4.
  */
-public class Problem {
+public class ExactCoverProblem {
     private static final Splitter splitter = Splitter.on(" ").omitEmptyStrings();
 
     private enum State {
@@ -35,7 +35,7 @@ public class Problem {
     private Function<List<Integer>, Boolean> reporter;
     private Runnable complete;
 
-    Problem() {}
+    ExactCoverProblem() {}
 
     private boolean defaultReport(List<Integer> options) {
         System.out.println("SOLUTION");
@@ -55,16 +55,6 @@ public class Problem {
             items.add(inodes.get(xnodes.get(ix).top).name);
         }
         return items;
-    }
-
-    public Problem onSolution(Function<List<Integer>, Boolean> reporter) {
-        this.reporter = reporter;
-        return this;
-    }
-
-    public Problem onComplete(Runnable r) {
-        this.complete = r;
-        return this;
     }
 
     private void addItem(String name) {
@@ -218,10 +208,10 @@ public class Problem {
     }
 
     /**
-     * Solve the exact cover problem. Returns solutions via callback established
-     * with #onComplete.
+     * Solve the exact cover problem. Announces each solution via supplied callback. Returns when
+     * all solutions (zero or more) have been found.
      */
-    public void solve() {
+    public void solve(Function<List<Integer>, Boolean> onSolution) {
         // print();
         if (state == State.ADDING_OPTIONS) state = State.SOLVING;
         if (state != State.SOLVING) throw new IllegalStateException("cannot start solving now");
@@ -237,7 +227,7 @@ public class Problem {
                         // visit
                         ArrayList<Integer> solution = Lists.newArrayListWithCapacity(l);
                         for (int k = 0; k < l; ++k) solution.add(-xnodes.get(x[k]-1).top);
-                        boolean proceed = reporter == null ? defaultReport(solution) : reporter.apply(solution);
+                        boolean proceed = onSolution.apply(solution);
                         if (!proceed) break STEP;
                         step = 8;
                         continue STEP;
@@ -290,7 +280,20 @@ public class Problem {
         if (complete != null) complete.run();
     }
 
-    public Problem parse(String problemDescription) {
+    /**
+     * Gather all solutions, however long that takes, and return them.
+     * @return
+     */
+    public List<List<Integer>> allSolutions() {
+        List<List<Integer>> solutions = new ArrayList<>();
+        solve(s -> {
+            solutions.add(s);
+            return true;
+        });
+        return solutions;
+    }
+
+    public ExactCoverProblem parse(String problemDescription) {
         return parse(new StringReader(problemDescription));
     }
 
@@ -302,7 +305,7 @@ public class Problem {
      * @param problemDescription
      * @return
      */
-    public Problem parse(Reader problemDescription) {
+    public ExactCoverProblem parse(Reader problemDescription) {
         if (state != State.ADDING_ITEMS || inodes.size() > 1) {
             throw new IllegalStateException("parse is used to provide the complete problem description");
         }
