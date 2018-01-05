@@ -119,7 +119,7 @@ public class Sudoku {
                 }
             }
         }
-        return new ExactCoverProblem().parse(sb.toString());
+        return ExactCoverProblem.parseFrom(sb.toString());
     }
 
     /**

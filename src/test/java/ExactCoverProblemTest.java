@@ -15,8 +15,7 @@ public class ExactCoverProblemTest {
 
     @Test
     public void example5() {
-        ExactCoverProblem p = new ExactCoverProblem();
-        p.parse("a b c d e f g\nc e\na d g\nb c f\na d f\nb g\nd e g");
+        ExactCoverProblem p = ExactCoverProblem.parseFrom("a b c d e f g\nc e\na d g\nb c f\na d f\nb g\nd e g");
         assertThat(p.allSolutions(), is(Collections.singletonList(Arrays.asList(3, 4, 0))));
     }
 
@@ -38,14 +37,14 @@ public class ExactCoverProblemTest {
 
     @Test
     public void langfordPairs3() {
-        ExactCoverProblem p = new ExactCoverProblem().parse(langfordPairsInstance(3));
+        ExactCoverProblem p = ExactCoverProblem.parseFrom(langfordPairsInstance(3));
         assertThat(p.allSolutions().stream().map(Sets::newTreeSet).collect(Collectors.toList()),
                 is(Arrays.asList(ImmutableSet.of(1, 6, 7), ImmutableSet.of(2, 4, 8))));
     }
 
     @Test
     public void langfordPairs4() {
-        ExactCoverProblem p = new ExactCoverProblem().parse(langfordPairsInstance(4));
+        ExactCoverProblem p = ExactCoverProblem.parseFrom(langfordPairsInstance(4));
         List<Set<Integer>> r = p.allSolutions().stream().map(Sets::newTreeSet).collect(Collectors.toList());
         assertThat(r, is(Arrays.asList(ImmutableSet.of(1, 10, 13, 15), ImmutableSet.of(4, 6, 12, 17))));
         Stream<Set<List<String>>> solutions = r.stream().map(sol ->
@@ -67,7 +66,7 @@ public class ExactCoverProblemTest {
     @Test
     public void langfordCounts() {
         List<Integer> counts = IntStream.range(2, 10)
-                .map(i -> new ExactCoverProblem().parse(langfordPairsInstance(i)).allSolutions().size())
+                .map(i -> ExactCoverProblem.parseFrom(langfordPairsInstance(i)).allSolutions().size())
                 .boxed()
                 .collect(Collectors.toList());
         assertThat(counts, is(Arrays.asList(0, 2, 2, 0, 0, 52, 300, 0)));

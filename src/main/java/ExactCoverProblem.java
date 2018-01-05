@@ -315,8 +315,8 @@ public class ExactCoverProblem {
         return solutions;
     }
 
-    public ExactCoverProblem parse(String problemDescription) {
-        return parse(new StringReader(problemDescription));
+    public static ExactCoverProblem parseFrom(String problemDescription) {
+        return parseFrom(new StringReader(problemDescription));
     }
 
     /**
@@ -327,10 +327,8 @@ public class ExactCoverProblem {
      * @param problemDescription
      * @return
      */
-    public ExactCoverProblem parse(Reader problemDescription) {
-        if (state != State.ADDING_ITEMS || inodes.size() > 1) {
-            throw new IllegalStateException("parse is used to provide the complete problem description");
-        }
+    public static ExactCoverProblem parseFrom(Reader problemDescription) {
+        ExactCoverProblem p = new ExactCoverProblem();
         Scanner s = new Scanner(problemDescription);
         if (!s.hasNextLine()) {
             throw new IllegalArgumentException("no item line");
@@ -339,14 +337,10 @@ public class ExactCoverProblem {
         if (items.size() < 1) {
             throw new IllegalArgumentException("no items");
         }
-        for (String i : items) {
-            addItem(i);
-        }
+        items.forEach(p::addItem);
         while (s.hasNextLine()) {
-            String l = s.nextLine();
-            addOption(splitter.split(l));
+            p.addOption(splitter.split(s.nextLine()));
         }
-        state = State.SOLVING;
-        return this;
+        return p;
     }
 }
