@@ -30,14 +30,11 @@ public class ExactCoverProblem {
     private State state = State.ADDING_ITEMS;
 
     private final Map<String, Integer> itemIndex = new HashMap<>();
-    // private final INode inodes;
     private final INode inode0 = new INode();
     private final ArrayList<INode> inodes = Lists.newArrayList(inode0);
     private final ArrayList<XNode> xnodes = new ArrayList<>();
     private final ArrayList<Integer> optionByNumber = new ArrayList<>();
     private int optionCount = 0;
-    private Function<List<Integer>, Boolean> reporter;
-    private Runnable complete;
 
     ExactCoverProblem() {}
 
@@ -303,7 +300,6 @@ public class ExactCoverProblem {
             }
         }
         state = State.COMPLETE;
-        if (complete != null) complete.run();
     }
 
     /**

@@ -57,6 +57,15 @@ public class Sudoku {
         }
     }
 
+    /**
+     * Construct a Sudoku-solver instance from a board string. The string uses
+     * the digits 1-9 in row by row, left to right order. A '.' indicates an
+     * empty cell. Other characters are ignored. Knuth's example 28(a) would begin:
+     * "..3 .1. ... 415" (etc.)
+     *
+     * @param boardString board representation with empty spaces recorded as '.'
+     * @return Sudoku object. Call solve() on it when you're ready.
+     */
     public static Sudoku fromBoardString(String boardString) {
         // A board might look like:
         // "..3 .1. ... 415 ... .9. 2.6" etc.
@@ -113,6 +122,10 @@ public class Sudoku {
         return new ExactCoverProblem().parse(sb.toString());
     }
 
+    /**
+     * Solves the Sudoku instance.
+     * @return An exhaustive list of solutions, in the same format as described in <code>fromBoardString</code>.
+     */
     public List<String> solve() {
         ExactCoverProblem p = toProblem();
         List<String> solutions = new ArrayList<>();
