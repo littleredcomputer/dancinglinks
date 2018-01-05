@@ -1,10 +1,9 @@
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import org.junit.Test;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -40,24 +39,25 @@ public class ExactCoverProblemTest {
     @Test
     public void langfordPairs3() {
         ExactCoverProblem p = new ExactCoverProblem().parse(langfordPairsInstance(3));
-        assertThat(p.allSolutions(), is(Arrays.asList(Arrays.asList(1, 7, 6), Arrays.asList(2, 4, 8))));
+        assertThat(p.allSolutions().stream().map(Sets::newTreeSet).collect(Collectors.toList()),
+                is(Arrays.asList(ImmutableSet.of(1, 6, 7), ImmutableSet.of(2, 4, 8))));
     }
 
     @Test
     public void langfordPairs4() {
         ExactCoverProblem p = new ExactCoverProblem().parse(langfordPairsInstance(4));
-        List<List<Integer>> r = p.allSolutions();
-        assertThat(r, is(Arrays.asList(Arrays.asList(1, 15, 10, 13), Arrays.asList(4, 6, 12, 17))));
-        Stream<List<List<String>>> solutions = r.stream().map(sol ->
-                sol.stream().map(p::optionIndexToItemNames).collect(Collectors.toList()));
+        List<Set<Integer>> r = p.allSolutions().stream().map(Sets::newTreeSet).collect(Collectors.toList());
+        assertThat(r, is(Arrays.asList(ImmutableSet.of(1, 10, 13, 15), ImmutableSet.of(4, 6, 12, 17))));
+        Stream<Set<List<String>>> solutions = r.stream().map(sol ->
+                sol.stream().map(p::optionIndexToItemNames).collect(Collectors.toSet()));
         assertThat(solutions.collect(Collectors.toList()), is(
                 ImmutableList.of(
-                        ImmutableList.of(
+                        ImmutableSet.of(
                                 ImmutableList.of("1", "s2", "s4"),
                                 ImmutableList.of("s1", "s6", "4"),
                                 ImmutableList.of("s5", "2", "s8"),
                                 ImmutableList.of("3", "s3", "s7")),
-                        ImmutableList.of(
+                        ImmutableSet.of(
                                 ImmutableList.of("1", "s5", "s7"),
                                 ImmutableList.of("s1", "2", "s4"),
                                 ImmutableList.of("s2", "s6", "3"),

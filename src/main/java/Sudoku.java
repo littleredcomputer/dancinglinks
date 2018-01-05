@@ -1,9 +1,15 @@
+import com.google.common.collect.ImmutableList;
+
+import java.util.ArrayList;
+import java.util.List;
+
 public class Sudoku {
     private int[][] constraints = new int[9][9];  // What choices remain valid for cell i,j?
     private int[] rows = new int[9];              // What numbers are free in row i?
     private int[] columns = new int[9];           // What numbers are free in column j?
     private int[] boxes = new int[9];             // What numbers are free in box k?
     private int[][] board = new int[9][9];
+    private List<List<Integer>> optionToMove = new ArrayList<>();
 
     private Sudoku() {
         // Initially all moves are possible; record possibilities as bitvectors
@@ -64,7 +70,6 @@ public class Sudoku {
                 int r = p / 9;
                 int c = p % 9;
                 int number = ch - '0';   // 1..9
-
                 sudoku.addEntry(r, c, number);
                 ++p;
             } else if (ch == '.') {
@@ -74,7 +79,7 @@ public class Sudoku {
         return sudoku;
     }
 
-    public ExactCoverProblem toProblem() {
+    private ExactCoverProblem toProblem() {
         StringBuilder sb = new StringBuilder();
         // Attach the items pij, rij, cij, bij for i = 1..9, j = 1..9
         for (int i = 0; i < 9; ++i) {
@@ -87,11 +92,11 @@ public class Sudoku {
             }
         }
         sb.append('\n');
+        // Generate the options.
         for (int i = 0; i < 9; ++i) {
             for (int j = 0; j < 9; ++j) {
                 int bits = constraints[i][j];
                 if (bits > 0) {
-                    System.out.printf("%d %d: ", i, j);
                     for (int k = 0; k < 9; ++k) {
                         if ((bits & (1<<k)) != 0) {
                             sb.append('p').append(i).append(j).append(' ');
@@ -99,14 +104,32 @@ public class Sudoku {
                             sb.append('c').append(j).append(k+1).append(' ');
                             sb.append('b').append(3 * (i/3) + j/3).append(k+1).append(' ');
                             sb.append('\n');
-                            System.out.printf("%d ", k+1);
+                            optionToMove.add(ImmutableList.of(i, j, k+1));
                         }
                     }
-                    System.out.println();
                 }
             }
         }
-        System.out.println(sb.toString());
         return new ExactCoverProblem().parse(sb.toString());
+    }
+
+    public List<String> solve() {
+        ExactCoverProblem p = toProblem();
+        List<String> solutions = new ArrayList<>();
+        p.solve(s -> {
+            s.forEach(o -> {
+                List<Integer> move = optionToMove.get(o);
+                board[move.get(0)][move.get(1)] = move.get(2);
+            });
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < 9; ++i) {
+                for (int j = 0; j < 9; j += 3) {
+                    sb.append(board[i][j]).append(board[i][j+1]).append(board[i][j+2]).append(' ');
+                }
+            }
+            solutions.add(sb.toString());
+            return true;
+        });
+        return solutions;
     }
 }

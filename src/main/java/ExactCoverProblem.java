@@ -16,13 +16,17 @@ import java.util.stream.StreamSupport;
 public class ExactCoverProblem {
     private static final Splitter splitter = Splitter.on(" ").omitEmptyStrings();
 
+    public enum Strategy {
+        FIRST,
+        MRV,
+    }
+    private Strategy strategy = Strategy.MRV;
     private enum State {
         ADDING_ITEMS,
         ADDING_OPTIONS,
         SOLVING,
         COMPLETE,
     }
-
     private State state = State.ADDING_ITEMS;
 
     private final Map<String, Integer> itemIndex = new HashMap<>();
@@ -222,18 +226,40 @@ public class ExactCoverProblem {
 
         STEP: while (true) {
             switch (step) {
+                // The cases are numbered in accordance with Algorithm D's steps. The switch
+                // is used to accomplish the go-tos between steps.
                 case 2:  // Enter level l.
                     if (inode0.rlink == 0) {
                         // visit
                         ArrayList<Integer> solution = Lists.newArrayListWithCapacity(l);
-                        for (int k = 0; k < l; ++k) solution.add(-xnodes.get(x[k]-1).top);
+                        for (int k = 0; k < l; ++k) {
+                            // Any x_i might be in the middle of an option; walk backward
+                            // to find the start of the option.
+                            int xk = x[k];
+                            while (xnodes.get(xk).top > 0) --xk;
+                            solution.add(-xnodes.get(xk).top);
+                        }
                         boolean proceed = onSolution.apply(solution);
                         if (!proceed) break STEP;
                         step = 8;
                         continue STEP;
                     }
                 // case 3:  // Choose i.
-                    i = inode0.rlink;  // no heuristic: choose first.
+                    switch (strategy) {
+                        case FIRST:
+                            i = inode0.rlink;
+                            break;
+                        case MRV:
+                            int minLen = Integer.MAX_VALUE;
+                            for (int ic = inode0.rlink; ic != 0; ic = inodes.get(ic).rlink) {
+                                int len = xnodes.get(ic).len;
+                                if (len < minLen) {
+                                    minLen = len;
+                                    i = ic;
+                                }
+                            }
+                            break;
+                    }
                 // case 4:  // Cover i.
                     cover(i);
                     x[l] = xnodes.get(i).dlink;
