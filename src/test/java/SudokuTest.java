@@ -1,10 +1,6 @@
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.*;
 
