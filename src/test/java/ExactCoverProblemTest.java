@@ -53,14 +53,14 @@ public class ExactCoverProblemTest {
                 ImmutableList.of(
                         ImmutableSet.of(
                                 ImmutableList.of("1", "s2", "s4"),
-                                ImmutableList.of("s1", "s6", "4"),
-                                ImmutableList.of("s5", "2", "s8"),
+                                ImmutableList.of("4", "s1", "s6"),
+                                ImmutableList.of("2", "s5", "s8"),
                                 ImmutableList.of("3", "s3", "s7")),
                         ImmutableSet.of(
                                 ImmutableList.of("1", "s5", "s7"),
-                                ImmutableList.of("s1", "2", "s4"),
-                                ImmutableList.of("s2", "s6", "3"),
-                                ImmutableList.of("s3", "4", "s8")))));
+                                ImmutableList.of("2", "s1", "s4"),
+                                ImmutableList.of("3", "s2", "s6"),
+                                ImmutableList.of("4", "s3", "s8")))));
     }
 
     @Test

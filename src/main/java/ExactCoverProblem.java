@@ -36,19 +36,7 @@ public class ExactCoverProblem {
     private final ArrayList<Integer> optionByNumber = new ArrayList<>();
     private int optionCount = 0;
 
-    ExactCoverProblem() {}
-
-    private boolean defaultReport(List<Integer> options) {
-        System.out.println("SOLUTION");
-        for (int k: options) {
-            System.out.print("  ");
-            for (int p = k; xnodes.get(p).top > 0; ++p) {
-                System.out.print(inodes.get(xnodes.get(p).top).name + " ");
-            }
-            System.out.println();
-        }
-        return true;
-    }
+    private ExactCoverProblem() {}
 
     public List<String> optionIndexToItemNames(int oi) {
         List<String> items = new ArrayList<>();
@@ -76,6 +64,12 @@ public class ExactCoverProblem {
         inodes.get(0).llink = ix;
     }
 
+    /**
+     * Add an option (nonempty subset of established items). Empty options are
+     * ignored. Repeated items in an option are ignored. Referring to an unknown
+     * option will throw.
+     * @param items sequence of item names
+     */
     private void addOption(Iterable<String> items) {
         if (state == State.ADDING_ITEMS) {
             state = State.ADDING_OPTIONS;
@@ -96,14 +90,11 @@ public class ExactCoverProblem {
         }
         XNode leftSpacer = xnodes.get(xnodes.size() - 1);
         XNode rightSpacer = new XNode();
-        // Sort the items in the option with respect to the order in which the items
-        // were introduced. In this way the representative item chosen for an option
-        // will be the left-most.
         List<Integer> indices = StreamSupport.stream(items.spliterator(), false)
+                .distinct()
                 .map(itemIndex::get)
-                .sorted()
                 .collect(Collectors.toList());
-
+        if (indices.size() == 0) return;
         int ix = 0;
         for (int ixnode : indices) {
             XNode xHead = xnodes.get(ixnode);
@@ -304,7 +295,7 @@ public class ExactCoverProblem {
 
     /**
      * Gather all solutions, however long that takes, and return them.
-     * @return
+     * @return A list of subsets of the set of option indexes (counting from zero) forming the exact covers.
      */
     public List<List<Integer>> allSolutions() {
         List<List<Integer>> solutions = new ArrayList<>();

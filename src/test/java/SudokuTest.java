@@ -57,9 +57,14 @@ public class SudokuTest {
     }
 
     @Test
-    public void supposedlyHardOne() {
+    public void supposedlyHardOnes() {
         String h = "..4 8.. ..7 .5. .1. .9. 1.. ..9 6.. 3.. ..4 5.. .4. .8. .3. ..8 2.. ..9 ..6 1.. ..4 .2. .3. .6. 5.. ..6 2..";
         assertThat(Sudoku.fromBoardString(h).solve(),
                 is(ImmutableList.of("694 825 317 853 617 492 172 349 685 319 764 528 245 981 736 768 253 149 936 172 854 427 538 961 581 496 273 ")));
+        // http://www.telegraph.co.uk/news/science/science-news/9359579/Worlds-hardest-sudoku-can-you-crack-it.html
+        String t = "8.. ... ... ..3 6.. ... .7. .9. 2.. .5. ..7 ... ... .45 7.. ... 1.. .3. ..1 ... .68 ..8 5.. .1. .9. ... 4..";
+        assertThat(Sudoku.fromBoardString(t).solve(),
+                is(ImmutableList.of("812 753 649 943 682 175 675 491 283 154 237 896 369 845 721 287 169 534 521 974 368 438 526 917 796 318 452 ")));
+
     }
 }
