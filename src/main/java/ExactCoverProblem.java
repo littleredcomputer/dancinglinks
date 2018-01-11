@@ -5,6 +5,7 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.util.*;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -14,7 +15,7 @@ import java.util.stream.StreamSupport;
  * of TAOCP volume 4.
  */
 public class ExactCoverProblem {
-    private static final Splitter splitter = Splitter.on(" ").omitEmptyStrings();
+    private static final Splitter splitter = Splitter.on(' ').omitEmptyStrings();
 
     public enum Strategy {
         FIRST,
@@ -314,7 +315,9 @@ public class ExactCoverProblem {
      * Parses a complete problem description. Problem must be in an
      * empty state. The format accepted is that described by Knuth
      * (first line: item names separated by whitespace; each subsequent
-     * line is one option, containing a subset of items).
+     * line is one option, containing a subset of items). The first line
+     * may contain a semicolon which separates primary from secondary
+     * options.
      * @param problemDescription
      * @return
      */
