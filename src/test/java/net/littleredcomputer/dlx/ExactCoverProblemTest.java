@@ -1,13 +1,12 @@
+package net.littleredcomputer.dlx;
+
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
-import javafx.beans.value.ChangeListener;
 import org.junit.Test;
 
 import java.util.*;
-import java.util.function.BiFunction;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;

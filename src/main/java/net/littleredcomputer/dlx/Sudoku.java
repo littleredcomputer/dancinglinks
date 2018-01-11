@@ -1,3 +1,5 @@
+package net.littleredcomputer.dlx;
+
 import com.google.common.collect.ImmutableList;
 
 import java.util.ArrayList;
@@ -58,13 +60,13 @@ public class Sudoku {
     }
 
     /**
-     * Construct a Sudoku-solver instance from a board string. The string uses
+     * Construct a net.littleredcomputer.dlx.Sudoku-solver instance from a board string. The string uses
      * the digits 1-9 in row by row, left to right order. A '.' indicates an
      * empty cell. Other characters are ignored. Knuth's example 28(a) would begin:
      * "..3 .1. ... 415" (etc.)
      *
      * @param boardString board representation with empty spaces recorded as '.'
-     * @return Sudoku object. Call solve() on it when you're ready.
+     * @return net.littleredcomputer.dlx.Sudoku object. Call solve() on it when you're ready.
      */
     public static Sudoku fromBoardString(String boardString) {
         // A board might look like:
@@ -123,7 +125,7 @@ public class Sudoku {
     }
 
     /**
-     * Solves the Sudoku instance.
+     * Solves the net.littleredcomputer.dlx.Sudoku instance.
      * @return An exhaustive list of solutions, in the same format as described in <code>fromBoardString</code>.
      */
     public List<String> solve() {

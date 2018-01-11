@@ -1,3 +1,5 @@
+package net.littleredcomputer.dlx;
+
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 
@@ -5,7 +7,6 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.util.*;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -111,7 +112,7 @@ public class ExactCoverProblem {
                 // The first item in the new option. We take care of two small bookkeeping tasks:
                 // ULINK(x) of a spacer is the adddress of the first node in the option before x
                 rightSpacer.ulink = ix;
-                // An index from option index to first XNode in the option
+                // An index from option index to first net.littleredcomputer.dlx.XNode in the option
                 optionByNumber.add(xnodes.size());
             }
             xnodes.add(x);
