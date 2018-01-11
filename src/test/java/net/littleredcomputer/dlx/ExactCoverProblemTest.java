@@ -78,9 +78,13 @@ public class ExactCoverProblemTest {
         assertThat(counts, is(Arrays.asList(0, 2, 2, 0, 0, 52, 300, 0)));
     }
 
-    private String nQueensWithSlackInstance(int n) {
+    private String nQueensInstance(int n, boolean slack) {
         StringBuilder sb = new StringBuilder();
         IntStream.range(1, n + 1).forEach(i -> sb.append('r').append(i).append(' ').append('c').append(i).append(' '));
+        if (!slack) {
+            // If we aren't using slack items, then the diagonal items are secondary
+            sb.append("; ");
+        }
         IntStream.range(2, 2 * n + 1).forEach(i -> sb.append('a').append(i).append(' '));
         IntStream.range(-n + 1, n).forEach(i -> sb.append('b').append(i).append(' '));
         sb.append('\n');  // now for the options
@@ -91,16 +95,18 @@ public class ExactCoverProblemTest {
                 sb.append("b").append(i - j).append('\n');
             }
         }
-        // slack options
-        IntStream.range(2, 2 * n + 1).forEach(i -> sb.append('a').append(i).append('\n'));
-        IntStream.range(-n + 1, n).forEach(i -> sb.append('b').append(i).append('\n'));
+        if (slack) {
+            // If using slack items, then we need corresponding slack options.
+            IntStream.range(2, 2 * n + 1).forEach(i -> sb.append('a').append(i).append('\n'));
+            IntStream.range(-n + 1, n).forEach(i -> sb.append('b').append(i).append('\n'));
+        }
         return sb.toString();
     }
 
     @Test
     public void fourQueensWithSlack() {
         // See (23) in [fasc5c]
-        ExactCoverProblem p = ExactCoverProblem.parseFrom(nQueensWithSlackInstance(4));
+        ExactCoverProblem p = ExactCoverProblem.parseFrom(nQueensInstance(4, true));
         assertThat(allSolutionOptions(p).collect(Collectors.toList()), is(
                 ImmutableList.of(
                         ImmutableSet.of(
@@ -134,7 +140,36 @@ public class ExactCoverProblemTest {
         // See also https://en.wikipedia.org/wiki/Eight_queens_puzzle#Counting_solutions
         assertThat(
                 IntStream.range(4, 11)
-                        .mapToLong(i->ExactCoverProblem.parseFrom(nQueensWithSlackInstance(i)).allSolutions().size())
+                        .mapToLong(i->ExactCoverProblem.parseFrom(nQueensInstance(i, true)).allSolutions().size())
+                        .toArray(),
+                is(new long[] {2, 10, 4, 40, 92, 352, 724})
+        );
+    }
+
+    @Test
+    public void fourQueensWithSecondaryItems() {
+        // See (23) in [fasc5c]
+        ExactCoverProblem p = ExactCoverProblem.parseFrom(nQueensInstance(4, false));
+        assertThat(allSolutionOptions(p).collect(Collectors.toList()), is(
+                ImmutableList.of(
+                        ImmutableSet.of(
+                                "r3 c1 a4 b2",
+                                "r4 c3 a7 b1",
+                                "r1 c2 a3 b-1",
+                                "r2 c4 a6 b-2"),
+                        ImmutableSet.of(
+                                "r4 c2 a6 b2",
+                                "r2 c1 a3 b1",
+                                "r1 c3 a4 b-2",
+                                "r3 c4 a7 b-1"))));
+    }
+
+    @Test
+    public void queensWithSecondaryItemsCounts() {
+        // Compute Q(n) using the secondary-items n-queens formulation
+        assertThat(
+                IntStream.range(4, 11)
+                        .mapToLong(i->ExactCoverProblem.parseFrom(nQueensInstance(i, false)).allSolutions().size())
                         .toArray(),
                 is(new long[] {2, 10, 4, 40, 92, 352, 724})
         );

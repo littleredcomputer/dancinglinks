@@ -38,7 +38,37 @@ public class ExactCoverProblem {
     private final ArrayList<Integer> optionByNumber = new ArrayList<>();
     private int optionCount = 0;
 
-    private ExactCoverProblem() {}
+    private ExactCoverProblem(Iterable<String> items) {
+        int N1 = 0;
+        boolean secondaryItems = false;
+        for (String item: items) {
+            if (item.equals(";")) {
+                if (secondaryItems) throw new IllegalArgumentException("tertiary items are not supported");
+                if (inodes.size() == 1) throw new IllegalArgumentException("there must be at least one primary item");
+                N1 = inodes.size() - 1;
+                secondaryItems = true;
+                continue;
+            }
+            if (itemIndex.containsKey(item)) throw new IllegalArgumentException("duplicate item: " + item);
+            INode i = new INode();
+            int ix = inodes.size();
+            inodes.add(i);
+            itemIndex.put(item, ix);
+            i.name = item;
+            i.llink = ix - 1;
+            inodes.get(ix-1).rlink = ix;
+        }
+        int N = inodes.size() - 1;
+        if (N1 == 0) N1 = N;
+        INode last = new INode();
+        last.llink = N;
+        inodes.add(last);
+        inodes.get(N).rlink = N+1;
+        inodes.get(N1+1).llink = N+1;
+        inodes.get(N1+1).rlink = N1+1;
+        inode0.llink = N1;
+        inodes.get(N1).rlink = 0;
+    }
 
     public List<String> optionIndexToItemNames(int oi) {
         List<String> items = new ArrayList<>();
@@ -46,24 +76,6 @@ public class ExactCoverProblem {
             items.add(inodes.get(xnodes.get(ix).top).name);
         }
         return items;
-    }
-
-    private void addItem(String name) {
-        if (state != State.ADDING_ITEMS) {
-            throw new IllegalStateException("cannot add more items now");
-        }
-        if (itemIndex.containsKey(name)) {
-            throw new IllegalArgumentException("item name " + name + " already used");
-        }
-        final int ix = inodes.size();
-        INode i = new INode();
-        inodes.add(i);
-        itemIndex.put(name, ix);
-        i.name = name;
-        i.llink = inode0.llink;
-        inodes.get(inode0.llink).rlink = ix;
-        i.rlink = 0;
-        inodes.get(0).llink = ix;
     }
 
     /**
@@ -319,20 +331,16 @@ public class ExactCoverProblem {
      * line is one option, containing a subset of items). The first line
      * may contain a semicolon which separates primary from secondary
      * options.
-     * @param problemDescription
-     * @return
+     * @param problemDescription textual description of XC problem
+     * @return a problem instance from which solutions may be generated
      */
     public static ExactCoverProblem parseFrom(Reader problemDescription) {
-        ExactCoverProblem p = new ExactCoverProblem();
+        // ExactCoverProblem p = new ExactCoverProblem();
         Scanner s = new Scanner(problemDescription);
         if (!s.hasNextLine()) {
             throw new IllegalArgumentException("no item line");
         }
-        ArrayList<String> items = Lists.newArrayList(splitter.split(s.nextLine()));
-        if (items.size() < 1) {
-            throw new IllegalArgumentException("no items");
-        }
-        items.forEach(p::addItem);
+        ExactCoverProblem p = new ExactCoverProblem(splitter.split(s.nextLine()));
         while (s.hasNextLine()) {
             p.addOption(splitter.split(s.nextLine()));
         }
