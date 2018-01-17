@@ -1,5 +1,6 @@
 package net.littleredcomputer.dlx;
 
+import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -18,7 +19,32 @@ public class ExactCoverProblemTest {
 
     private Stream<Set<String>> allSolutionOptions(ExactCoverProblem p) {
         Joiner j = Joiner.on(' ');
-        return p.allSolutions().stream().map(sol -> sol.stream().map(p::optionIndexToItemNames).map(j::join).collect(Collectors.toSet()));
+        return p.allSolutions().stream().map(p::optionsToItems).map(s -> s.stream().map(j::join).collect(Collectors.toSet()));
+    }
+
+    @Test(expected=IllegalArgumentException.class)
+    public void mustHaveAtLeastOnePrimaryOption() {
+        ExactCoverProblem.parseFrom("; b c d\nb\nc\nd");
+    }
+
+    @Test(expected=IllegalArgumentException.class)
+    public void cannotHaveTertiaryItems() {
+        ExactCoverProblem.parseFrom("a ; b ; c\na\nb\nc");
+    }
+
+    @Test(expected=IllegalArgumentException.class)
+    public void cannotRepeatItems() {
+        ExactCoverProblem.parseFrom("a b a\na\nb");
+    }
+
+    @Test(expected=NullPointerException.class)
+    public void unknownItemInOption() {
+        ExactCoverProblem.parseFrom("a b c\na\nd\nb");
+    }
+
+    @Test
+    public void simple() {
+        assertThat(ExactCoverProblem.parseFrom("a b c\na b\nb c\nc a\na").allSolutions(), is(Arrays.asList(Arrays.asList(1, 3))));
     }
 
     @Test
@@ -173,5 +199,68 @@ public class ExactCoverProblemTest {
                         .toArray(),
                 is(new long[] {2, 10, 4, 40, 92, 352, 724})
         );
+    }
+
+    private char encode(int i) {
+        if (i < 0 || i > 61) throw new IllegalArgumentException("out of range");
+        if (i < 10) return (char) (0x30 + i);
+        if (i < 36) return (char) (0x57 + i);
+        return (char) (0x1d + i);
+    }
+
+    private void gridItems(StringBuilder sb, int m) {
+        for (int x = 0; x < m; ++x) {
+            for (int y = 0; y < m; ++y) {
+                sb.append(encode(x)).append(encode(y)).append(' ');
+            }
+        }
+    }
+    /**
+     * Options for a square n x n object to lie within an m x m grid.
+     * We assume coordinates are of the form
+     * @param n side length of square object
+     * @param m side length of square arena
+     * @return newline-separated options for this piece.
+     */
+    private void squarePieceOptions(StringBuilder sb, String name, int n, int m) {
+        for (int x = 0; x <= m - n; ++x) {
+            for (int y = 0; y <= m - n; ++y) {
+                sb.append(name).append(' ');
+                for (int i = 0; i < n; ++i) {
+                    for (int j = 0; j < n; ++j) {
+                        sb.append(encode(x+i)).append(encode(y+j)).append(' ');
+                    }
+                }
+                sb.append('\n');
+            }
+        }
+    }
+
+    public void easySquarePackingProblem() {
+        StringBuilder items = new StringBuilder();
+        // Let's start with a small, solvable problem. Pack 1 1x1, 5 2x2, 3 3x3 and 3 4x4 cells
+        // into a 10x10 grid. That won't fill the whole grid so let all the cell options be secondary
+        // but require placement of all the pieces.
+        StringBuilder pd = new StringBuilder();
+        final int M = 10;
+        pd.append("p1.0 p2.0 p2.1 p2.2 p2.3 p2.4 p3.0 p3.1 p3.2 p4.0 p4.1 p4.2 ; ");
+        gridItems(pd, M);
+        pd.append('\n');
+        squarePieceOptions(pd, "p1.0", 1, M);
+        squarePieceOptions(pd, "p2.0", 2, M);
+        squarePieceOptions(pd, "p2.1", 2, M);
+        squarePieceOptions(pd, "p2.2", 2, M);
+        squarePieceOptions(pd, "p2.3", 2, M);
+        squarePieceOptions(pd, "p2.4", 2, M);
+        for (int i = 0; i < 3; ++i) {
+            squarePieceOptions(pd, "p3."+i, 3, M);
+            squarePieceOptions(pd, "p4."+i, 4, M);
+        }
+        ExactCoverProblem p = ExactCoverProblem.parseFrom(pd.toString());
+        p.solve(s -> {
+            System.out.println(s);
+            return true;
+        });
+
     }
 }

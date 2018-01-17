@@ -1,11 +1,14 @@
 package net.littleredcomputer.dlx;
 
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import sun.jvm.hotspot.oops.InstanceKlass;
 
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -23,59 +26,62 @@ public class ExactCoverProblem {
         MRV,
     }
     private Strategy strategy = Strategy.MRV;
-    private enum State {
-        ADDING_ITEMS,
-        ADDING_OPTIONS,
-        SOLVING,
-        COMPLETE,
-    }
-    private State state = State.ADDING_ITEMS;
 
-    private final Map<String, Integer> itemIndex = new HashMap<>();
-    private final INode inode0 = new INode();
-    private final ArrayList<INode> inodes = Lists.newArrayList(inode0);
-    private final ArrayList<XNode> xnodes = new ArrayList<>();
-    private final ArrayList<Integer> optionByNumber = new ArrayList<>();
-    private int optionCount = 0;
+    // where we left off:
+    // fix addOption so that it does more safety checking and builds an index with integers
+    // for each option.
+
+    // Separate out the logic that builds the tableau, so that it can drive an iterator.
+    // In this way: reporting results can re-use the immutable map of option numbers built
+    // when the thing was constructed and we don't need any state.
+
+    private final ImmutableList<String> items;
+    private final Map<String, Integer> itemIndex = new HashMap<>();  // inverse of above mapping
+    private final List<List<Integer>> options = new ArrayList<>();  // integer to option == subset of item indices
+
+    // private final INode inode0 = new INode();
+    // private final ArrayList<INode> inodes = Lists.newArrayList(inode0);
+    // private final ArrayList<XNode> xnodes = new ArrayList<>();
+    // private final ArrayList<Integer> optionByNumber = new ArrayList<>();
+
+    private final int N;  // N and N1 are as in Knuth
+    private final int N1;     // index of last primary item (== N if there are no secondary items)
+
+    // private int optionCount = 0;
 
     private ExactCoverProblem(Iterable<String> items) {
-        int N1 = 0;
+        List<String> items = new ArrayList<>();
+        items.add("*UNUSED*");
         boolean secondaryItems = false;
-        for (String item: items) {
+        int lastPrimaryItem = 0;
+        for (String item : items) {
             if (item.equals(";")) {
                 if (secondaryItems) throw new IllegalArgumentException("tertiary items are not supported");
-                if (inodes.size() == 1) throw new IllegalArgumentException("there must be at least one primary item");
-                N1 = inodes.size() - 1;
+                if (items.size() < 2) throw new IllegalArgumentException("there must be at least one primary item");
+                lastPrimaryItem = items.size() - 1;
                 secondaryItems = true;
                 continue;
             }
             if (itemIndex.containsKey(item)) throw new IllegalArgumentException("duplicate item: " + item);
-            INode i = new INode();
-            int ix = inodes.size();
-            inodes.add(i);
-            itemIndex.put(item, ix);
-            i.name = item;
-            i.llink = ix - 1;
-            inodes.get(ix-1).rlink = ix;
+            itemIndex.put(item, items.size());
+            items.add(item);
         }
-        int N = inodes.size() - 1;
-        if (N1 == 0) N1 = N;
-        INode last = new INode();
-        last.llink = N;
-        inodes.add(last);
-        inodes.get(N).rlink = N+1;
-        inodes.get(N1+1).llink = N+1;
-        inodes.get(N1+1).rlink = N1+1;
-        inode0.llink = N1;
-        inodes.get(N1).rlink = 0;
+        if (items.size() <= 1) throw new IllegalArgumentException("There must be at least one item");
+        N = items.size() - 1;
+        N1 = lastPrimaryItem > 0 ? lastPrimaryItem : N;
+        this.items = ImmutableList.copyOf(items);
     }
 
-    public List<String> optionIndexToItemNames(int oi) {
-        List<String> items = new ArrayList<>();
-        for (int ix = optionByNumber.get(oi); xnodes.get(ix).top > 0; ++ix) {
-            items.add(inodes.get(xnodes.get(ix).top).name);
+    public List<List<String>> optionsToItems(List<Integer> options) {
+        List<List<String>> itemSubsets = new ArrayList<>();
+        for (int o : options) {
+            List<String> items = new ArrayList<>();
+            for (int item = optionByNumber.get(o); xnodes.get(item).top > 0; ++item) {
+                items.add(inodes.get(xnodes.get(item).top).name);
+            }
+            itemSubsets.add(items);
         }
-        return items;
+        return itemSubsets;
     }
 
     /**
@@ -85,226 +91,292 @@ public class ExactCoverProblem {
      * @param items sequence of item names
      */
     private void addOption(Iterable<String> items) {
-        if (state == State.ADDING_ITEMS) {
-            state = State.ADDING_OPTIONS;
-            // Add first spacer
+        Set<Integer> itemsSeen = new HashSet<>();
+        List<Integer> itemsOfOption = new ArrayList<>();
+
+        for (String item : items) {
+            Integer ix = itemIndex.get(item);
+            if (ix == null) throw new IllegalArgumentException("unknown item: " + item);
+            if (itemsSeen.contains(ix)) throw new IllegalArgumentException("item repeated in option: " + item);
+            itemsOfOption.add(ix);
+            itemsSeen.add(ix);
+        }
+        if (itemsOfOption.isEmpty()) return;
+        options.add(itemsOfOption);
+    }
+
+//    private void print() {
+//        System.out.println("INodes");
+//        for (INode i : inodes) {
+//            System.out.printf("%s %d %d\n", i.name, i.llink, i.rlink);
+//        }
+//        System.out.println("XNodes");
+//        for (int i = 0; i < xnodes.size(); ++i) {
+//            XNode x = xnodes.get(i);
+//            System.out.printf("%d: %d %s %d %d\n", i, x.len, x.top > 0 ? inodes.get(x.top).name : x.top, x.ulink, x.dlink);
+//        }
+//    }
+
+    public class Solutions implements Spliterator<List<Integer>> {
+
+        private final List<INode> inodes = new ArrayList<>();
+        private final List<XNode> xnodes = new ArrayList<>();
+
+        Solutions() {
+            // The first INode is the head of the doubly-linked list of items.
+            inodes.add(new INode("*FIRST*"));
+            // One header for each item
+            for (String item : items) {
+                INode i = new INode(item);
+                int ix = inodes.size()
+                inodes.add(i);
+                i.llink = ix - 1;
+                inodes.get(ix-1).rlink = ix;
+            }
+            // The trailing element serves as the head of the doubly-linked list of secondary items, if any are present.
+            INode last = new INode("*LAST*");
+            last.llink = N;
+            inodes.add(last);
+            inodes.get(N).rlink = N+1;
+            inodes.get(N1+1).llink = N+1;
+            inodes.get(N1+1).rlink = N1+1;
+            inodes.get(0).llink = N1;
+            inodes.get(N1).rlink = 0;
+            // Build tableau of xnodes: add first spacer
             xnodes.add(new XNode());
-            for (int i = 1; i < inodes.size(); ++i) {
+            // Add option head nodes, one for each item
+            for (int ix = 1; ix <= N; ++ix) {
                 XNode x = new XNode();
-                int ix = xnodes.size();
                 xnodes.add(x);
                 x.ulink = x.dlink = ix;
-                x.top = i;
+                x.len = 0;
             }
-            // Add spacer after head nodes.
+            // Add first spacer after head nodes.
             xnodes.add(new XNode());
-        }
-        if (state != State.ADDING_OPTIONS) {
-            throw new IllegalStateException("cannot add more options now");
-        }
-        XNode leftSpacer = xnodes.get(xnodes.size() - 1);
-        XNode rightSpacer = new XNode();
-        List<Integer> indices = StreamSupport.stream(items.spliterator(), false)
-                .distinct()
-                .map(itemIndex::get)
-                .collect(Collectors.toList());
-        if (indices.size() == 0) return;
-        int ix = 0;
-        for (int ixnode : indices) {
-            XNode xHead = xnodes.get(ixnode);
-            xHead.len++;
-            XNode x = new XNode();
-            ix = xnodes.size();
-            x.ulink = xHead.ulink;
-            xnodes.get(xHead.ulink).dlink = ix;
-            x.dlink = ixnode;
-            x.top = ixnode;
-            xHead.ulink = ix;
-            if (rightSpacer.ulink == 0) {
-                // The first item in the new option. We take care of two small bookkeeping tasks:
-                // ULINK(x) of a spacer is the adddress of the first node in the option before x
-                rightSpacer.ulink = ix;
-                // An index from option index to first net.littleredcomputer.dlx.XNode in the option
-                optionByNumber.add(xnodes.size());
-            }
-            xnodes.add(x);
-        }
-        leftSpacer.dlink = ix;
-        leftSpacer.top = -optionCount;
-        xnodes.add(rightSpacer);
-        ++optionCount;
-    }
 
-    private void hide(int p) {
-        // System.out.printf("hide %d\n", p);
-        int q = p + 1;
-        while (q != p) {
-            XNode xq = xnodes.get(q);
-            int x = xq.top;
-            int u = xq.ulink;
-            int d = xq.dlink;
-            if (x <= 0) {
-                q = u;
-            } else {
-                xnodes.get(u).dlink = d;
-                xnodes.get(d).ulink = u;
-                xnodes.get(x).len--;
-                ++q;
-            }
-        }
-    }
+            // Wrap what follows into a for loop
 
-    private void cover(int i) {
-        // System.out.printf("cover %d\n", i);
-        int p = xnodes.get(i).dlink;
-        while (p != i) {
-            hide(p);
-            p = xnodes.get(p).dlink;
-        }
-        INode ii = inodes.get(i);
-        int l = ii.llink;
-        int r = ii.rlink;
-        inodes.get(l).rlink = r;
-        inodes.get(r).llink = l;
-    }
-
-    private void uncover(int i) {
-        // System.out.printf("uncover %d\n", i);
-        INode ii = inodes.get(i);
-        int l = ii.llink;
-        int r = ii.rlink;
-        inodes.get(l).rlink = i;
-        inodes.get(r).llink = i;
-        int p = xnodes.get(i).ulink;
-        while (p != i) {
-            unhide(p);
-            p = xnodes.get(p).ulink;
-        }
-    }
-
-    private void unhide(int p) {
-        // System.out.printf("unhide %d\n", p);
-        int q = p - 1;
-        while (q != p) {
-            XNode xq = xnodes.get(q);
-            int x = xq.top;
-            int u = xq.ulink;
-            int d = xq.dlink;
-            if (x <= 0) {
-                q = d;  // q was a spacer
-            } else {
-                xnodes.get(u).dlink = q;
-                xnodes.get(d).ulink = q;
-                ++xnodes.get(x).len;
-                --q;
-            }
-        }
-    }
-
-    private void print() {
-        System.out.println("INodes");
-        for (INode i : inodes) {
-            System.out.printf("%s %d %d\n", i.name, i.llink, i.rlink);
-        }
-        System.out.println("XNodes");
-        for (int i = 0; i < xnodes.size(); ++i) {
-            XNode x = xnodes.get(i);
-            System.out.printf("%d: %d %s %d %d\n", i, x.len, x.top > 0 ? inodes.get(x.top).name : x.top, x.ulink, x.dlink);
-        }
-    }
-
-    /**
-     * Solve the exact cover problem. Announces each solution via supplied callback. Returns when
-     * all solutions (zero or more) have been found.
-     */
-    public void solve(Function<List<Integer>, Boolean> onSolution) {
-        // print();
-        if (state == State.ADDING_OPTIONS) state = State.SOLVING;
-        if (state != State.SOLVING) throw new IllegalStateException("cannot start solving now");
-        int[] x = new int[optionCount];
-        int i = 0;
-        int l = 0;
-        int step = 2;
-
-        STEP: while (true) {
-            switch (step) {
-                // The cases are numbered in accordance with Algorithm D's steps. The switch
-                // is used to accomplish the go-tos between steps.
-                case 2:  // Enter level l.
-                    if (inode0.rlink == 0) {
-                        // visit
-                        ArrayList<Integer> solution = Lists.newArrayListWithCapacity(l);
-                        for (int k = 0; k < l; ++k) {
-                            // Any x_i might be in the middle of an option; walk backward
-                            // to find the start of the option.
-                            int xk = x[k];
-                            while (xnodes.get(xk).top > 0) --xk;
-                            solution.add(-xnodes.get(xk).top);
-                        }
-                        boolean proceed = onSolution.apply(solution);
-                        if (!proceed) break STEP;
-                        step = 8;
-                        continue STEP;
+            for (List<Integer> option : options) {
+                XNode leftSpacer = xnodes.get(xnodes.size() - 1);
+                XNode rightSpacer = null;
+                int ix = 0;
+                for (int ixnode : option) {
+                    XNode xHead = xnodes.get(ixnode);
+                    xHead.len++;
+                    XNode x = new XNode();
+                    ix = xnodes.size();
+                    x.ulink = xHead.ulink;
+                    xnodes.get(xHead.ulink).dlink = ix;
+                    x.dlink = ixnode;
+                    x.top = ixnode;
+                    xHead.ulink = ix;
+                    if (rightSpacer == null) {
+                        rightSpacer = new XNode();
+                        // The first item in the new option. We take care of two small bookkeeping tasks:
+                        // ULINK(x) of a spacer is the address of the first node in the option before x
+                        rightSpacer.ulink = ix;
+                        // An index from option index to first XNode in the option
+                        optionByNumber.add(xnodes.size());
                     }
-                // case 3:  // Choose i.
-                    switch (strategy) {
-                        case FIRST:
-                            i = inode0.rlink;
-                            break;
-                        case MRV:
-                            int minLen = Integer.MAX_VALUE;
-                            for (int ic = inode0.rlink; ic != 0; ic = inodes.get(ic).rlink) {
-                                int len = xnodes.get(ic).len;
-                                if (len < minLen) {
-                                    minLen = len;
-                                    i = ic;
-                                }
+                    xnodes.add(x);
+                }
+                leftSpacer.dlink = ix;
+                leftSpacer.top = -optionCount;
+                xnodes.add(rightSpacer);
+                ++optionCount;
+            }
+
+
+
+
+
+
+        }
+
+
+        private void hide(int p) {
+            // System.out.printf("hide %d\n", p);
+            int q = p + 1;
+            while (q != p) {
+                XNode xq = xnodes.get(q);
+                int x = xq.top;
+                int u = xq.ulink;
+                int d = xq.dlink;
+                if (x <= 0) {
+                    q = u;
+                } else {
+                    xnodes.get(u).dlink = d;
+                    xnodes.get(d).ulink = u;
+                    xnodes.get(x).len--;
+                    ++q;
+                }
+            }
+        }
+
+        private void cover(int i) {
+            // System.out.printf("cover %d\n", i);
+            int p = xnodes.get(i).dlink;
+            while (p != i) {
+                hide(p);
+                p = xnodes.get(p).dlink;
+            }
+            INode ii = inodes.get(i);
+            int l = ii.llink;
+            int r = ii.rlink;
+            inodes.get(l).rlink = r;
+            inodes.get(r).llink = l;
+        }
+
+        private void uncover(int i) {
+            // System.out.printf("uncover %d\n", i);
+            INode ii = inodes.get(i);
+            int l = ii.llink;
+            int r = ii.rlink;
+            inodes.get(l).rlink = i;
+            inodes.get(r).llink = i;
+            int p = xnodes.get(i).ulink;
+            while (p != i) {
+                unhide(p);
+                p = xnodes.get(p).ulink;
+            }
+        }
+
+        private void unhide(int p) {
+            // System.out.printf("unhide %d\n", p);
+            int q = p - 1;
+            while (q != p) {
+                XNode xq = xnodes.get(q);
+                int x = xq.top;
+                int u = xq.ulink;
+                int d = xq.dlink;
+                if (x <= 0) {
+                    q = d;  // q was a spacer
+                } else {
+                    xnodes.get(u).dlink = q;
+                    xnodes.get(d).ulink = q;
+                    ++xnodes.get(x).len;
+                    --q;
+                }
+            }
+        }
+
+
+
+
+        /**
+         * Solve the exact cover problem. Announces each solution via supplied callback. Returns when
+         * all solutions (zero or more) have been found.
+         */
+        public void solve(Function<List<Integer>, Boolean> onSolution) {
+            // print();
+            int[] x = new int[optionCount];
+            int i = 0;
+            int l = 0;
+            int step = 2;
+
+            STEP: while (true) {
+                switch (step) {
+                    // The cases are numbered in accordance with Algorithm D's steps. The switch
+                    // is used to accomplish the go-tos between steps.
+                    case 2:  // Enter level l.
+                        if (inodes.get(0).rlink == 0) {
+                            // visit
+                            ArrayList<Integer> solution = Lists.newArrayListWithCapacity(l);
+                            for (int k = 0; k < l; ++k) {
+                                // Any x_i might be in the middle of an option; walk backward
+                                // to find the start of the option.
+                                int xk = x[k];
+                                while (xnodes.get(xk).top > 0) --xk;
+                                solution.add(-xnodes.get(xk).top);
                             }
-                            break;
-                    }
-                // case 4:  // Cover i.
-                    cover(i);
-                    x[l] = xnodes.get(i).dlink;
-                case 5:  // Try x[l].
-                    if (x[l] == i) {
-                        step = 7;
+                            boolean proceed = onSolution.apply(solution);
+                            if (!proceed) break STEP;
+                            step = 8;
+                            continue STEP;
+                        }
+                        // case 3:  // Choose i.
+                        switch (strategy) {
+                            case FIRST:
+                                i = inodes.get(0).rlink;
+                                break;
+                            case MRV:
+                                int minLen = Integer.MAX_VALUE;
+                                for (int ic = inode0.rlink; ic != 0; ic = inodes.get(ic).rlink) {
+                                    int len = xnodes.get(ic).len;
+                                    if (len < minLen) {
+                                        minLen = len;
+                                        i = ic;
+                                    }
+                                }
+                                break;
+                        }
+                        // case 4:  // Cover i.
+                        cover(i);
+                        x[l] = xnodes.get(i).dlink;
+                    case 5:  // Try x[l].
+                        if (x[l] == i) {
+                            step = 7;
+                            continue STEP;
+                        }
+                        for (int p = x[l] + 1; p != x[l]; ) {
+                            int j = xnodes.get(p).top;
+                            if (j <= 0) {
+                                p = xnodes.get(p).ulink;
+                            } else {
+                                cover(j);
+                                ++p;
+                            }
+                        }
+                        ++l;
+                        step = 2;
                         continue STEP;
-                    }
-                    for (int p = x[l] + 1; p != x[l]; ) {
-                        int j = xnodes.get(p).top;
-                        if (j <= 0) {
-                            p = xnodes.get(p).ulink;
-                        } else {
-                            cover(j);
-                            ++p;
+                    case 6:  // Try again.
+                        for (int p = x[l] - 1; p != x[l]; ) {
+                            int j = xnodes.get(p).top;
+                            if (j <= 0) {
+                                p = xnodes.get(p).dlink;
+                            } else {
+                                uncover(j);
+                                --p;
+                            }
                         }
-                    }
-                    ++l;
-                    step = 2;
-                    continue STEP;
-                case 6:  // Try again.
-                    for (int p = x[l] - 1; p != x[l]; ) {
-                        int j = xnodes.get(p).top;
-                        if (j <= 0) {
-                            p = xnodes.get(p).dlink;
-                        } else {
-                            uncover(j);
-                            --p;
-                        }
-                    }
-                    i = xnodes.get(x[l]).top;
-                    x[l] = xnodes.get(x[l]).dlink;
-                    step = 5;
-                    continue STEP;
-                case 7:  // Backtrack.
-                    uncover(i);
-                case 8:  // Leave level l.
-                    if (l == 0) break STEP;
-                    --l;
-                    step = 6;
+                        i = xnodes.get(x[l]).top;
+                        x[l] = xnodes.get(x[l]).dlink;
+                        step = 5;
+                        continue STEP;
+                    case 7:  // Backtrack.
+                        uncover(i);
+                    case 8:  // Leave level l.
+                        if (l == 0) break STEP;
+                        --l;
+                        step = 6;
+                }
             }
         }
-        state = State.COMPLETE;
+
+
+
+
+
+        @Override
+        public boolean tryAdvance(Consumer<? super List<Integer>> action) {
+            return false;
+        }
+
+        @Override
+        public Spliterator<List<Integer>> trySplit() {
+            return null;
+        }
+
+        @Override
+        public long estimateSize() {
+            return 0;
+        }
+
+        @Override
+        public int characteristics() {
+            return 0;
+        }
     }
 
     /**
