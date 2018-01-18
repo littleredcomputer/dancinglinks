@@ -5,18 +5,17 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 public class Sudoku {
-    private int[][] constraints = new int[9][9];  // What choices remain valid for cell i,j?
-    private int[] rows = new int[9];              // What numbers are free in row i?
-    private int[] columns = new int[9];           // What numbers are free in column j?
-    private int[] boxes = new int[9];             // What numbers are free in box k?
-    private int[][] board = new int[9][9];
-    private List<List<Integer>> optionToMove = new ArrayList<>();
+    private final int[][] constraints = new int[9][9];  // What choices remain valid for cell i,j?
+    private final int[] rows = new int[9];              // What numbers are free in row i?
+    private final int[] columns = new int[9];           // What numbers are free in column j?
+    private final int[] boxes = new int[9];             // What numbers are free in box k?
+    private final int[][] board = new int[9][9];
+    private final List<List<Integer>> optionToMove = new ArrayList<>();
 
     private Sudoku() {
-        // Initially all moves are possible; record possibilities as bitvectors
+        // Initially all moves are possible; record possibilities as bit vectors
         int mask = (1<<9) - 1;
         for (int i = 0; i < board.length; ++i) {
             rows[i] = columns[i] = boxes[i] = mask;

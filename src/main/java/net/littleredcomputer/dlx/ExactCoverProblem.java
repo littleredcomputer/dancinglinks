@@ -25,7 +25,7 @@ public class ExactCoverProblem {
         FIRST,
         MRV,
     }
-    private Strategy strategy = Strategy.MRV;
+    private final Strategy strategy = Strategy.MRV;
 
     private final ImmutableList<String> items;
     private final ImmutableMap<String, Integer> itemIndex;  // inverse of above mapping
@@ -215,16 +215,15 @@ public class ExactCoverProblem {
         private int step = 2;
         private int i = 0;
         private int l = 0;
-        private int[] x = new int[options.size()];
+        private final int[] x = new int[options.size()];
 
         /**
-         * Solve the exact cover problem. Announces each solution via supplied callback. Returns when
-         * all solutions (zero or more) have been found.
+         * Solve the exact cover problem. Announces each solution via supplied consumer and returns true.
+         * Returns false when all solutions (zero or more) have been found.
          */
         @Override
         public boolean tryAdvance(Consumer<? super List<Integer>> action) {
             // print();
-
             STEP: while (true) {
                 switch (step) {
                     // The cases are numbered in accordance with Algorithm D's steps. The switch
@@ -325,11 +324,10 @@ public class ExactCoverProblem {
     }
 
     /**
-     * Parses a complete problem description. Problem must be in an
-     * empty state. The format accepted is that described by Knuth
+     * Parses a complete problem description. The format accepted is that described by Knuth
      * (first line: item names separated by whitespace; each subsequent
      * line is one option, containing a subset of items). The first line
-     * may contain a semicolon which separates primary from secondary
+     * may contain one semicolon (as a word) which separates primary from secondary
      * options.
      * @param problemDescription textual description of XC problem
      * @return a problem instance from which solutions may be generated
