@@ -2,15 +2,15 @@ package net.littleredcomputer.dlx;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import sun.jvm.hotspot.oops.InstanceKlass;
 
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 
@@ -27,61 +27,47 @@ public class ExactCoverProblem {
     }
     private Strategy strategy = Strategy.MRV;
 
-    // where we left off:
-    // fix addOption so that it does more safety checking and builds an index with integers
-    // for each option.
-
-    // Separate out the logic that builds the tableau, so that it can drive an iterator.
-    // In this way: reporting results can re-use the immutable map of option numbers built
-    // when the thing was constructed and we don't need any state.
-
     private final ImmutableList<String> items;
-    private final Map<String, Integer> itemIndex = new HashMap<>();  // inverse of above mapping
+    private final ImmutableMap<String, Integer> itemIndex;  // inverse of above mapping
     private final List<List<Integer>> options = new ArrayList<>();  // integer to option == subset of item indices
-
-    // private final INode inode0 = new INode();
-    // private final ArrayList<INode> inodes = Lists.newArrayList(inode0);
-    // private final ArrayList<XNode> xnodes = new ArrayList<>();
-    // private final ArrayList<Integer> optionByNumber = new ArrayList<>();
 
     private final int N;  // N and N1 are as in Knuth
     private final int N1;     // index of last primary item (== N if there are no secondary items)
 
-    // private int optionCount = 0;
-
     private ExactCoverProblem(Iterable<String> items) {
-        List<String> items = new ArrayList<>();
-        items.add("*UNUSED*");
+        List<String> is = new ArrayList<>();
+        ImmutableMap.Builder<String, Integer> mb = new ImmutableMap.Builder<>();
+        Set<String> itemsSeen = new HashSet<>();
+        is.add("*UNUSED*");
         boolean secondaryItems = false;
         int lastPrimaryItem = 0;
         for (String item : items) {
             if (item.equals(";")) {
                 if (secondaryItems) throw new IllegalArgumentException("tertiary items are not supported");
-                if (items.size() < 2) throw new IllegalArgumentException("there must be at least one primary item");
-                lastPrimaryItem = items.size() - 1;
+                if (is.size() < 2) throw new IllegalArgumentException("there must be at least one primary item");
+                lastPrimaryItem = is.size() - 1;
                 secondaryItems = true;
                 continue;
             }
-            if (itemIndex.containsKey(item)) throw new IllegalArgumentException("duplicate item: " + item);
-            itemIndex.put(item, items.size());
-            items.add(item);
+            if (itemsSeen.contains(item)) throw new IllegalArgumentException("duplicate item: " + item);
+            itemsSeen.add(item);
+            mb.put(item, is.size());
+            is.add(item);
         }
-        if (items.size() <= 1) throw new IllegalArgumentException("There must be at least one item");
-        N = items.size() - 1;
+        if (is.size() <= 1) throw new IllegalArgumentException("There must be at least one item");
+        N = is.size() - 1;
         N1 = lastPrimaryItem > 0 ? lastPrimaryItem : N;
-        this.items = ImmutableList.copyOf(items);
+        itemIndex = mb.build();
+        this.items = ImmutableList.copyOf(is);
+    }
+
+    public Stream<List<Integer>> solutions() {
+        return StreamSupport.stream(new Solutions(), false);
     }
 
     public List<List<String>> optionsToItems(List<Integer> options) {
-        List<List<String>> itemSubsets = new ArrayList<>();
-        for (int o : options) {
-            List<String> items = new ArrayList<>();
-            for (int item = optionByNumber.get(o); xnodes.get(item).top > 0; ++item) {
-                items.add(inodes.get(xnodes.get(item).top).name);
-            }
-            itemSubsets.add(items);
-        }
-        return itemSubsets;
+        return options.stream().map(o ->
+                this.options.get(o).stream().map(items::get).collect(Collectors.toList())).collect(Collectors.toList());
     }
 
     /**
@@ -105,22 +91,22 @@ public class ExactCoverProblem {
         options.add(itemsOfOption);
     }
 
-//    private void print() {
-//        System.out.println("INodes");
-//        for (INode i : inodes) {
-//            System.out.printf("%s %d %d\n", i.name, i.llink, i.rlink);
-//        }
-//        System.out.println("XNodes");
-//        for (int i = 0; i < xnodes.size(); ++i) {
-//            XNode x = xnodes.get(i);
-//            System.out.printf("%d: %d %s %d %d\n", i, x.len, x.top > 0 ? inodes.get(x.top).name : x.top, x.ulink, x.dlink);
-//        }
-//    }
-
-    public class Solutions implements Spliterator<List<Integer>> {
+    private class Solutions implements Spliterator<List<Integer>> {
 
         private final List<INode> inodes = new ArrayList<>();
         private final List<XNode> xnodes = new ArrayList<>();
+
+        private void print() {
+            System.out.println("INodes");
+            for (INode i : inodes) {
+                System.out.printf("%s %d %d\n", i.name, i.llink, i.rlink);
+            }
+            System.out.println("XNodes");
+            for (int i = 0; i < xnodes.size(); ++i) {
+                XNode x = xnodes.get(i);
+                System.out.printf("%d: %d %s %d %d\n", i, x.len, x.top > 0 ? inodes.get(x.top).name : x.top, x.ulink, x.dlink);
+            }
+        }
 
         Solutions() {
             // The first INode is the head of the doubly-linked list of items.
@@ -128,7 +114,7 @@ public class ExactCoverProblem {
             // One header for each item
             for (String item : items) {
                 INode i = new INode(item);
-                int ix = inodes.size()
+                int ix = inodes.size();
                 inodes.add(i);
                 i.llink = ix - 1;
                 inodes.get(ix-1).rlink = ix;
@@ -154,43 +140,35 @@ public class ExactCoverProblem {
             // Add first spacer after head nodes.
             xnodes.add(new XNode());
 
-            // Wrap what follows into a for loop
+            // Add the options.
 
-            for (List<Integer> option : options) {
+            for (int oi = 0; oi < options.size(); ++oi) {
+                List<Integer> option = options.get(oi);
                 XNode leftSpacer = xnodes.get(xnodes.size() - 1);
-                XNode rightSpacer = null;
+                XNode rightSpacer = new XNode();
                 int ix = 0;
-                for (int ixnode : option) {
-                    XNode xHead = xnodes.get(ixnode);
+                for (int item : option) {
+                    XNode xHead = xnodes.get(item);
                     xHead.len++;
                     XNode x = new XNode();
                     ix = xnodes.size();
                     x.ulink = xHead.ulink;
                     xnodes.get(xHead.ulink).dlink = ix;
-                    x.dlink = ixnode;
-                    x.top = ixnode;
+                    x.dlink = item;
+                    x.top = item;
                     xHead.ulink = ix;
-                    if (rightSpacer == null) {
-                        rightSpacer = new XNode();
+                    if (rightSpacer.ulink == 0) {
                         // The first item in the new option. We take care of two small bookkeeping tasks:
-                        // ULINK(x) of a spacer is the address of the first node in the option before x
+                        // ULINK(x) of a spacer is the adddress of the first node in the option before x
                         rightSpacer.ulink = ix;
-                        // An index from option index to first XNode in the option
-                        optionByNumber.add(xnodes.size());
+                        // An index from option index to first net.littleredcomputer.dlx.XNode in the option
                     }
                     xnodes.add(x);
                 }
                 leftSpacer.dlink = ix;
-                leftSpacer.top = -optionCount;
+                leftSpacer.top = -oi;
                 xnodes.add(rightSpacer);
-                ++optionCount;
             }
-
-
-
-
-
-
         }
 
 
@@ -260,19 +238,18 @@ public class ExactCoverProblem {
             }
         }
 
-
-
+        private int step = 2;
+        private int i = 0;
+        private int l = 0;
+        private int[] x = new int[options.size()];
 
         /**
          * Solve the exact cover problem. Announces each solution via supplied callback. Returns when
          * all solutions (zero or more) have been found.
          */
-        public void solve(Function<List<Integer>, Boolean> onSolution) {
+        @Override
+        public boolean tryAdvance(Consumer<? super List<Integer>> action) {
             // print();
-            int[] x = new int[optionCount];
-            int i = 0;
-            int l = 0;
-            int step = 2;
 
             STEP: while (true) {
                 switch (step) {
@@ -289,10 +266,9 @@ public class ExactCoverProblem {
                                 while (xnodes.get(xk).top > 0) --xk;
                                 solution.add(-xnodes.get(xk).top);
                             }
-                            boolean proceed = onSolution.apply(solution);
-                            if (!proceed) break STEP;
                             step = 8;
-                            continue STEP;
+                            action.accept(solution);
+                            return true;
                         }
                         // case 3:  // Choose i.
                         switch (strategy) {
@@ -301,7 +277,7 @@ public class ExactCoverProblem {
                                 break;
                             case MRV:
                                 int minLen = Integer.MAX_VALUE;
-                                for (int ic = inode0.rlink; ic != 0; ic = inodes.get(ic).rlink) {
+                                for (int ic = inodes.get(0).rlink; ic != 0; ic = inodes.get(ic).rlink) {
                                     int len = xnodes.get(ic).len;
                                     if (len < minLen) {
                                         minLen = len;
@@ -347,20 +323,11 @@ public class ExactCoverProblem {
                     case 7:  // Backtrack.
                         uncover(i);
                     case 8:  // Leave level l.
-                        if (l == 0) break STEP;
+                        if (l == 0) return false;
                         --l;
                         step = 6;
                 }
             }
-        }
-
-
-
-
-
-        @Override
-        public boolean tryAdvance(Consumer<? super List<Integer>> action) {
-            return false;
         }
 
         @Override
@@ -370,26 +337,13 @@ public class ExactCoverProblem {
 
         @Override
         public long estimateSize() {
-            return 0;
+            return Long.MAX_VALUE;
         }
 
         @Override
         public int characteristics() {
             return 0;
         }
-    }
-
-    /**
-     * Gather all solutions, however long that takes, and return them.
-     * @return A list of subsets of the set of option indexes (counting from zero) forming the exact covers.
-     */
-    public List<List<Integer>> allSolutions() {
-        List<List<Integer>> solutions = new ArrayList<>();
-        solve(s -> {
-            solutions.add(s);
-            return true;
-        });
-        return solutions;
     }
 
     public static ExactCoverProblem parseFrom(String problemDescription) {

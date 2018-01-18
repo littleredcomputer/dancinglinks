@@ -4,6 +4,8 @@ import com.google.common.collect.ImmutableList;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 public class Sudoku {
     private int[][] constraints = new int[9][9];  // What choices remain valid for cell i,j?
@@ -124,27 +126,20 @@ public class Sudoku {
         return ExactCoverProblem.parseFrom(sb.toString());
     }
 
-    /**
-     * Solves the net.littleredcomputer.dlx.Sudoku instance.
-     * @return An exhaustive list of solutions, in the same format as described in <code>fromBoardString</code>.
-     */
-    public List<String> solve() {
-        ExactCoverProblem p = toProblem();
-        List<String> solutions = new ArrayList<>();
-        p.solve(s -> {
-            s.forEach(o -> {
-                List<Integer> move = optionToMove.get(o);
-                board[move.get(0)][move.get(1)] = move.get(2);
-            });
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < 9; ++i) {
-                for (int j = 0; j < 9; j += 3) {
-                    sb.append(board[i][j]).append(board[i][j+1]).append(board[i][j+2]).append(' ');
-                }
-            }
-            solutions.add(sb.toString());
-            return true;
-        });
-        return solutions;
+    public Stream<String> solutions() {
+        return toProblem().solutions()
+                .map(sol -> {
+                    sol.forEach(o -> {
+                        List<Integer> move = optionToMove.get(o);
+                        board[move.get(0)][move.get(1)] = move.get(2);
+                    });
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < 9; ++i) {
+                        for (int j = 0; j < 9; j += 3) {
+                            sb.append(board[i][j]).append(board[i][j+1]).append(board[i][j+2]).append(' ');
+                        }
+                    }
+                    return sb.toString();
+                });
     }
 }
