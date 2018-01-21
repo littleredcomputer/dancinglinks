@@ -1,3 +1,4 @@
+// Copyright 2018 Colin Smith. MIT License.
 package net.littleredcomputer.dlx;
 
 import com.google.common.base.Splitter;

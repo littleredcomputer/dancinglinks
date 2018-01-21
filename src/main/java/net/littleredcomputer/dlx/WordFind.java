@@ -1,3 +1,4 @@
+// Copyright 2018 Colin Smith. MIT License.
 package net.littleredcomputer.dlx;
 
 import java.util.ArrayList;
@@ -26,7 +27,7 @@ public class WordFind {
      * @param n number of columns of grid
      * @param words with which to fil grid
      */
-    WordFind(int m, int n, Iterable<String> words) {
+    WordFind(int m, int n, List<String> words) {
         this.m = m;
         this.n = n;
         for (String w : words) {

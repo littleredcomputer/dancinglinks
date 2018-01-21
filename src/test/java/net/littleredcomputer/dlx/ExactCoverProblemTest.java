@@ -3,6 +3,7 @@ package net.littleredcomputer.dlx;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+// Copyright 2018 Colin Smith. MIT License.
 import com.google.common.collect.Sets;
 import org.junit.Test;
 
