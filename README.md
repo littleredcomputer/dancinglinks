@@ -97,6 +97,6 @@ I P I D R A O I
 S I G O N S G R
 E N S A U R O N
 ```
-A dot character is used for cells that are unused after the packing is achieved; Thus in this case we
-can see that in this case every cell in the grid participates in the puzzle.
+A dot character is used for cells that are unused after the packing is achieved; thus in this case we
+can see that every cell in the grid participates in the puzzle.
 
