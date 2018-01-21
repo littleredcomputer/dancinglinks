@@ -1,7 +1,7 @@
 # dancinglinks
 ## Knuth's Dancing Links algorithm in Java
 
-Implementation of ideas found in Knuth's Fascicle 5C of TAoCP.
+Implementation of ideas found in [Knuth's Fascicle 5C](https://www.cs.stanford.edu/~knuth/fasc5c.ps.gz) of [TAoCP](https://en.wikipedia.org/wiki/The_Art_of_Computer_Programming).
 
 The text describes variants of the Dancing Links algorithm, which can be used to solve the
 Exact Cover (XC) problem. One has a set of *items*, together with a set of *options* (which are 
@@ -39,7 +39,7 @@ indicating which options (counting from zero) form the solution.
 
 The stream is lazy: calling `solutions()` only pays the cost of setting up the problem tableau. 
 Each demand for a new element of the stream will provoke a search for the next distinct solution,
-which will stop as soon as one is found. The search for solutions will be exhaustive if you drain
+which will stop as soon as one is found. The search for solutions will be exhaustive only if you consume
 the whole stream.
 
 Adapters are provided for a few applications of XC that Knuth proposes.
@@ -99,4 +99,15 @@ E N S A U R O N
 ```
 A dot character is used for cells that are unused after the packing is achieved; thus in this case we
 can see that every cell in the grid participates in the puzzle.
+
+### Secondary Items and Colored Options
+
+Secondary items (which must occur *at most* once in any solution, instead of *exactly once* are 
+supported. In the item line (i.e., the first line), you can have a lone semicolon which will 
+divide the primary from the secondary items (there should be whitespace on either side of the 
+semicolon), like: `a b c ; x y`.
+
+An item within an option my be given a color using a colon suffix, like `b c x:Red`. The XCC 
+algorithem implemented here will ensure that all options chosen for a solution will agree on 
+the "color" the secondary items included.
 
