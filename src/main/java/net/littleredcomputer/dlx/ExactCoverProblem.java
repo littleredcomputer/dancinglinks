@@ -4,6 +4,8 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.Reader;
 import java.io.StringReader;
@@ -20,6 +22,8 @@ import java.util.stream.StreamSupport;
  */
 public class ExactCoverProblem {
     private static final Splitter splitter = Splitter.on(' ').omitEmptyStrings();
+    private static final Splitter colonSplitter = Splitter.on(':').omitEmptyStrings();
+    private static final Logger log = LogManager.getLogger(ExactCoverProblem.class);
 
     public enum Strategy {
         FIRST,
@@ -27,9 +31,18 @@ public class ExactCoverProblem {
     }
     private final Strategy strategy = Strategy.MRV;
 
+    private static class Option {
+        Option(int item, int color) { this.item = item; this.color = color; }
+        int item;
+        int color;
+    }
+
     private final ImmutableList<String> items;
     private final ImmutableMap<String, Integer> itemIndex;  // inverse of above mapping
-    private final List<List<Integer>> options = new ArrayList<>();  // integer to option == subset of item indices
+    private final List<List<Option>> options = new ArrayList<>();  // integer to option == subset of item indices
+    private final List<String> colors = new ArrayList<>();  // integer to color (one-based)
+    private final Map<String, Integer> colorIndex = new HashMap<>();
+
 
     private final int N;  // N and N1 are as in Knuth
     private final int N1;     // index of last primary item (== N if there are no secondary items)
@@ -38,7 +51,9 @@ public class ExactCoverProblem {
         List<String> is = new ArrayList<>();
         ImmutableMap.Builder<String, Integer> mb = new ImmutableMap.Builder<>();
         Set<String> itemsSeen = new HashSet<>();
+        // Create a dummy item and color, so that the indices to these are one-based
         is.add("*UNUSED*");
+        colors.add("*UNUSED*");
         boolean secondaryItems = false;
         int lastPrimaryItem = 0;
         for (String item : items) {
@@ -66,25 +81,38 @@ public class ExactCoverProblem {
     }
 
     public List<List<String>> optionsToItems(List<Integer> options) {
-        return options.stream().map(o ->
-                this.options.get(o).stream().map(items::get).collect(Collectors.toList())).collect(Collectors.toList());
+        return options.stream().map(i ->
+                this.options.get(i).stream().map(o -> items.get(o.item)).collect(Collectors.toList())).collect(Collectors.toList());
+    }
+
+    private int colorToNumber(String color) {
+        Integer i = colorIndex.get(color);
+        if (i != null) return i;
+        int index = colors.size();
+        colors.add(color);
+        colorIndex.put(color, index);
+        return index;
     }
 
     /**
      * Add an option (nonempty subset of established items). Empty options are
      * ignored. Repeated items in an option are ignored. Referring to an unknown
-     * option will throw.
+     * option will throw. The colon character is special: An option given in the
+     * form o:c refers to item o with color c.
      * @param items sequence of item names
      */
     private void addOption(Iterable<String> items) {
         Set<Integer> itemsSeen = new HashSet<>();
-        List<Integer> itemsOfOption = new ArrayList<>();
+        List<Option> itemsOfOption = new ArrayList<>();
 
-        for (String item : items) {
+        for (String itemcolor : items) {
+            List<String> oc = colonSplitter.splitToList(itemcolor);
+            if (oc.size() < 1 || oc.size() > 2) throw new IllegalArgumentException("malformed option " + itemcolor);
+            String item = oc.get(0);
             Integer ix = itemIndex.get(item);
             if (ix == null) throw new IllegalArgumentException("unknown item: " + item);
             if (itemsSeen.contains(ix)) throw new IllegalArgumentException("item repeated in option: " + item);
-            itemsOfOption.add(ix);
+            itemsOfOption.add(new Option(ix, oc.size() > 1 ? colorToNumber(oc.get(1)) : 0));
             itemsSeen.add(ix);
         }
         if (itemsOfOption.isEmpty()) return;
@@ -98,6 +126,7 @@ public class ExactCoverProblem {
         private final int[] ulink;
         private final int[] dlink;
         private final int[] top;
+        private final int[] color;
 
         Solutions() {
             for (int i = 1; i < llink.length; ++i) {
@@ -112,12 +141,13 @@ public class ExactCoverProblem {
             rlink[N1] = 0;
 
             int nxnodes = items.size() + options.size() + 1;  // all the headers + all the spacers
-            for (List<Integer> l : options) {
+            for (List<?> l : options) {
                 nxnodes += l.size();
             }
             ulink = new int[nxnodes];
             dlink = new int[nxnodes];
             top = new int[nxnodes];
+            color = new int[nxnodes];
 
             for (int i = 0; i < ulink.length; ++i) {
                 ulink[i] = dlink[i] = i;
@@ -128,9 +158,10 @@ public class ExactCoverProblem {
             top[p] = 0;
             int q;
 
-            for (List<Integer> o : options) {
-                for (int j = 1; j <= o.size(); ++j) {
-                    int ij = o.get(j-1);
+            for (List<Option> os : options) {
+                for (int j = 1; j <= os.size(); ++j) {
+                    Option o = os.get(j-1);
+                    int ij = o.item;
                     ++len[ij];
 
                     q = ulink[ij];
@@ -139,21 +170,26 @@ public class ExactCoverProblem {
                     dlink[p+j] = ij;
                     ulink[ij] = p+j;
                     top[p+j] = ij;
+                    color[p+j] = o.color;
                 }
-                final int k = o.size();
+                final int k = os.size();
                 ++M;
                 dlink[p] = p+k;
                 p += k+1;
                 top[p] = -M;
                 ulink[p] = p-k;
             }
+            log.info("tableau created.");
         }
-
 
         private void hide(int p) {
             // System.out.printf("hide %d\n", p);
             int q = p + 1;
             while (q != p) {
+                if (color[q] < 0) {
+                    ++q;
+                    continue;
+                }
                 int x = top[q];
                 int u = ulink[q];
                 int d = dlink[q];
@@ -194,10 +230,14 @@ public class ExactCoverProblem {
             }
         }
 
-        private void unhide(int p) {
+        private void unhide(int p) {  // this is unhide' from (53) of 7.2.2.1
             // System.out.printf("unhide %d\n", p);
             int q = p - 1;
             while (q != p) {
+                if (color[q] < 0) {
+                    --q;
+                    continue;
+                }
                 int x = top[q];
                 int u = ulink[q];
                 int d = dlink[q];
@@ -209,6 +249,36 @@ public class ExactCoverProblem {
                     ++len[x];
                     --q;
                 }
+            }
+        }
+
+        private void commit(int p, int j) {  // 7.2.2.1 (54)
+            final int c = color[p];
+            if (c == 0) cover(j);
+            else if (c > 0) purify(p);
+        }
+
+        private void purify(int p) {  // 7.2.2.1 (55)
+            final int c = color[p];
+            final int i = top[p];
+            for (int q = dlink[i]; q != i; q = dlink[q]) {
+                if (color[q] != c) hide(q);
+                else if (q != p) color[q] = -1;
+            }
+        }
+
+        private void uncommit(int p, int j)  {  // 7.2.2.1 (56)
+            int c = color[p];
+            if (c == 0) uncover(j);
+            else if (c > 0) unpurify(p);
+        }
+
+        private void unpurify(int p) {  // 7.2.2.1 (57)
+            final int c = color[p];
+            final int i = top[p];
+            for (int q = ulink[i]; q != i; q = ulink[q]) {
+                if (color[q] < 0) color[q] = c;
+                else if (q != p) unhide(q);
             }
         }
 
@@ -272,7 +342,7 @@ public class ExactCoverProblem {
                             if (j <= 0) {
                                 p = ulink[p];
                             } else {
-                                cover(j);
+                                commit(p, j);
                                 ++p;
                             }
                         }
@@ -285,7 +355,7 @@ public class ExactCoverProblem {
                             if (j <= 0) {
                                 p = dlink[p];
                             } else {
-                                uncover(j);
+                                uncommit(p, j);
                                 --p;
                             }
                         }
