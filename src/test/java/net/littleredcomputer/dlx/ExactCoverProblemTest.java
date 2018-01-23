@@ -3,6 +3,7 @@ package net.littleredcomputer.dlx;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+// Copyright 2018 Colin Smith. MIT License.
 import com.google.common.collect.Sets;
 import org.junit.Test;
 
@@ -12,16 +13,18 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
 public class ExactCoverProblemTest {
 
-    private Stream<Set<String>> allSolutionOptions(ExactCoverProblem p) {
+    private List<Set<String>> allSolutionOptions(ExactCoverProblem p) {
         Joiner j = Joiner.on(' ');
-        return p.solutions().map(p::optionsToItems).map(s -> s.stream().map(j::join).collect(Collectors.toSet()));
+        return p.solutions()
+                .map(p::optionsToItems)
+                .map(s -> s.stream().map(j::join).collect(Collectors.toSet()))
+                .collect(Collectors.toList());
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -85,18 +88,17 @@ public class ExactCoverProblemTest {
         ExactCoverProblem p = ExactCoverProblem.parseFrom(langfordPairsInstance(4));
         List<Set<Integer>> r = p.solutions().map(Sets::newTreeSet).collect(Collectors.toList());
         assertThat(r, is(Arrays.asList(ImmutableSet.of(1, 10, 13, 15), ImmutableSet.of(4, 6, 12, 17))));
-        assertThat(allSolutionOptions(ExactCoverProblem.parseFrom(langfordPairsInstance(4))).collect(Collectors.toList()), is(
-                ImmutableList.of(
-                        ImmutableSet.of(
-                                "1 s2 s4",
-                                "4 s1 s6",
-                                "2 s5 s8",
-                                "3 s3 s7"),
-                        ImmutableSet.of(
-                                "1 s5 s7",
-                                "2 s1 s4",
-                                "3 s2 s6",
-                                "4 s3 s8"))));
+        assertThat(allSolutionOptions(ExactCoverProblem.parseFrom(langfordPairsInstance(4))), is(ImmutableList.of(
+                ImmutableSet.of(
+                        "1 s2 s4",
+                        "4 s1 s6",
+                        "2 s5 s8",
+                        "3 s3 s7"),
+                ImmutableSet.of(
+                        "1 s5 s7",
+                        "2 s1 s4",
+                        "3 s2 s6",
+                        "4 s3 s8"))));
     }
 
     @Test
@@ -136,30 +138,29 @@ public class ExactCoverProblemTest {
     public void fourQueensWithSlack() {
         // See (23) in [fasc5c]
         ExactCoverProblem p = ExactCoverProblem.parseFrom(nQueensInstance(4, true));
-        assertThat(allSolutionOptions(p).collect(Collectors.toList()), is(
-                ImmutableList.of(
-                        ImmutableSet.of(
-                                "a2",
-                                "b3",
-                                "r3 c1 a4 b2",
-                                "r4 c3 a7 b1",
-                                "a5",
-                                "a8",
-                                "b-3",
-                                "b0",
-                                "r1 c2 a3 b-1",
-                                "r2 c4 a6 b-2"),
-                        ImmutableSet.of(
-                                "a2",
-                                "b3",
-                                "r4 c2 a6 b2",
-                                "a5",
-                                "a8",
-                                "b-3",
-                                "r2 c1 a3 b1",
-                                "r1 c3 a4 b-2",
-                                "r3 c4 a7 b-1",
-                                "b0"))));
+        assertThat(allSolutionOptions(p), is(ImmutableList.of(
+                ImmutableSet.of(
+                        "a2",
+                        "b3",
+                        "r3 c1 a4 b2",
+                        "r4 c3 a7 b1",
+                        "a5",
+                        "a8",
+                        "b-3",
+                        "b0",
+                        "r1 c2 a3 b-1",
+                        "r2 c4 a6 b-2"),
+                ImmutableSet.of(
+                        "a2",
+                        "b3",
+                        "r4 c2 a6 b2",
+                        "a5",
+                        "a8",
+                        "b-3",
+                        "r2 c1 a3 b1",
+                        "r1 c3 a4 b-2",
+                        "r3 c4 a7 b-1",
+                        "b0"))));
     }
 
 
@@ -179,18 +180,17 @@ public class ExactCoverProblemTest {
     public void fourQueensWithSecondaryItems() {
         // See (23) in [fasc5c]
         ExactCoverProblem p = ExactCoverProblem.parseFrom(nQueensInstance(4, false));
-        assertThat(allSolutionOptions(p).collect(Collectors.toList()), is(
-                ImmutableList.of(
-                        ImmutableSet.of(
-                                "r3 c1 a4 b2",
-                                "r4 c3 a7 b1",
-                                "r1 c2 a3 b-1",
-                                "r2 c4 a6 b-2"),
-                        ImmutableSet.of(
-                                "r4 c2 a6 b2",
-                                "r2 c1 a3 b1",
-                                "r1 c3 a4 b-2",
-                                "r3 c4 a7 b-1"))));
+        assertThat(allSolutionOptions(p), is(ImmutableList.of(
+                ImmutableSet.of(
+                        "r3 c1 a4 b2",
+                        "r4 c3 a7 b1",
+                        "r1 c2 a3 b-1",
+                        "r2 c4 a6 b-2"),
+                ImmutableSet.of(
+                        "r4 c2 a6 b2",
+                        "r2 c1 a3 b1",
+                        "r1 c3 a4 b-2",
+                        "r3 c4 a7 b-1"))));
     }
 
     @Test
