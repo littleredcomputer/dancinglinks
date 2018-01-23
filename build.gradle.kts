@@ -1,8 +1,16 @@
+// import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 group = "net.littleredcomputer"
 version = "1.0-SNAPSHOT"
 
 plugins {
     java
+    application
+    // id("com.github.johnrengelman.plugin-shadow") version "2.0.2"
+}
+
+application {
+    mainClassName = "net.littleredcomputer.dlx.WordFind"
 }
 
 repositories {
@@ -19,3 +27,4 @@ dependencies {
 configure<JavaPluginConvention> {
     sourceCompatibility = JavaVersion.VERSION_1_8
 }
+

@@ -117,4 +117,9 @@ public class WordFind {
         }
         return s.toString();
     }
+
+    public static void main(String[] args) {
+        // read arguments & print solutions
+        System.out.println("hello world " + args);
+    }
 }

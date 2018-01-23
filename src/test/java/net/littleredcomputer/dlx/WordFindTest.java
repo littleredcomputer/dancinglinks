@@ -2,12 +2,15 @@
 package net.littleredcomputer.dlx;
 
 import com.google.common.base.Splitter;
+import javafx.util.Pair;
 import org.junit.Test;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.*;
