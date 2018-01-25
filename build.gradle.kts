@@ -10,7 +10,7 @@ plugins {
 }
 
 application {
-    mainClassName = "net.littleredcomputer.dlx.WordFind"
+    mainClassName = "net.littleredcomputer.dlx.Main"
 }
 
 repositories {
@@ -22,6 +22,7 @@ dependencies {
     compile("com.google.guava", "guava", "23.5-jre")
     compile("org.apache.logging.log4j", "log4j-api", "2.10.0")
     compile("org.apache.logging.log4j", "log4j-core", "2.10.0")
+    compile("commons-cli", "commons-cli", "1.4")
 }
 
 configure<JavaPluginConvention> {
