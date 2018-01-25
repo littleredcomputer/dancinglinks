@@ -1,19 +1,22 @@
 package net.littleredcomputer.dlx;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Splitter;
 import org.apache.commons.cli.*;
 
 import java.io.*;
 
 public class Main {
     private static Joiner spaceJoiner = Joiner.on(' ');
+    private static Splitter commaSplitter = Splitter.on(',');
 
     private static Options options() {
         return new Options()
                 .addOption("task", true, "type of problem to solve")
                 .addOption("problem", true, "filename of problem description")
-                .addOption("w", true, "width")
-                .addOption("h", true, "height")
+                .addOption("board", true, "sudoku board [1-9.]{81}")
+                .addOption("width", true, "width")
+                .addOption("height", true, "height")
                 .addOption("words", true, "words to fit");
     }
 
@@ -35,6 +38,14 @@ public class Main {
                 s.forEach(System.out::println);
                 System.out.println();
             });
+        } else if (task.equals("sudoku")) {
+            Sudoku.fromBoardString(cmd.getOptionValue("board")).solutions().forEach(System.out::println);
+        } else if (task.equals("wordfind")) {
+            int w = Integer.parseInt(cmd.getOptionValue("width"));
+            int h = Integer.parseInt(cmd.getOptionValue("height"));
+            new WordFind(w, h, commaSplitter.splitToList(cmd.getOptionValue("words")))
+                    .solutions()
+                    .forEach(System.out::println);
         } else {
             throw new IllegalArgumentException("unknown task: " + task);
         }
