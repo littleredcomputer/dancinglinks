@@ -2,9 +2,18 @@ package net.littleredcomputer.dlx;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
-import org.apache.commons.cli.*;
+import com.google.common.collect.Lists;
+import javafx.util.Pair;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 
 import java.io.*;
+import java.util.List;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class Main {
     private static Joiner spaceJoiner = Joiner.on(' ');
@@ -28,26 +37,79 @@ public class Main {
                 : new FileReader(p));
     }
 
+    private static Stream<Pair<Integer, Integer>> boxSizeStream() {
+        return Stream.generate(new Supplier<Pair<Integer, Integer>>() {
+            int width = 2;
+            int height = 2;
+
+            @Override
+            public Pair<Integer, Integer> get() {
+                Pair<Integer, Integer> p = new Pair<>(width, height);
+                if (height == width) {
+                    ++width;
+                    height = 2;
+                } else {
+                    ++height;
+                }
+                return p;
+            }
+        });
+    }
+
     public static void main(String[] args) throws ParseException, FileNotFoundException {
         CommandLine cmd = new DefaultParser().parse(options(), args);
         if (!cmd.hasOption("task")) throw new IllegalArgumentException("Must specify --task");
         String task = cmd.getOptionValue("task");
-        if (task.equals("exactcover")) {
-            ExactCoverProblem p = ExactCoverProblem.parseFrom(problem(cmd));
-            p.solutions().map(p::optionsToItems).map(s -> s.stream().map(spaceJoiner::join)).forEach(s -> {
-                s.forEach(System.out::println);
-                System.out.println();
-            });
-        } else if (task.equals("sudoku")) {
-            Sudoku.fromBoardString(cmd.getOptionValue("board")).solutions().forEach(System.out::println);
-        } else if (task.equals("wordfind")) {
-            int w = Integer.parseInt(cmd.getOptionValue("width"));
-            int h = Integer.parseInt(cmd.getOptionValue("height"));
-            new WordFind(w, h, commaSplitter.splitToList(cmd.getOptionValue("words")))
-                    .solutions()
-                    .forEach(System.out::println);
-        } else {
-            throw new IllegalArgumentException("unknown task: " + task);
+        switch (task) {
+            case "exactcover":
+                ExactCoverProblem p = ExactCoverProblem.parseFrom(problem(cmd));
+                p.solutions().map(p::optionsToItems).map(s -> s.stream().map(spaceJoiner::join)).forEach(s -> {
+                    s.forEach(System.out::println);
+                    System.out.println();
+                });
+                break;
+            case "sudoku":
+                Sudoku.fromBoardString(cmd.getOptionValue("board")).solutions().forEach(System.out::println);
+                break;
+            case "wordfind":
+                int w = Integer.parseInt(cmd.getOptionValue("width"));
+                int h = Integer.parseInt(cmd.getOptionValue("height"));
+                List<String> words = commaSplitter.splitToList(cmd.getOptionValue("words"));
+                if (w == 0 && h == 0) {
+                    long distinctCh = words.stream()
+                            .flatMap(s->Lists.charactersOf(s.toUpperCase()).stream())
+                            .distinct()
+                            .count();
+                    long maxWordLen = words.stream().map(String::length).max(Integer::compare).orElse(0);
+                    System.out.println("distinct chars " + distinctCh);
+                    System.out.println("longest word " + maxWordLen);
+                    final boolean[] found = new boolean[] {false};
+                    // consider letting the fixed-size case be handled with Stream.of(size)
+                    for (Pair<Integer, Integer> wh : (Iterable<Pair<Integer, Integer>>) boxSizeStream()::iterator) {
+                        w = wh.getKey();
+                        h = wh.getValue();
+                        if (w*h < distinctCh || (w < maxWordLen && h < maxWordLen)) {
+                            System.out.println(w + "x" + h + " is too small");
+                            continue;
+                        }
+                        new WordFind(w, h, words).solutions().forEach(s -> {
+                            System.out.println(s);
+                            found[0] = true;
+                        });
+                        if (found[0]) break;
+                        else System.out.println("no solution found for size " + wh.getKey() + "x" + wh.getValue());
+                    }
+                } else {
+                    new WordFind(w, h, words)
+                            .solutions()
+                            .forEach(System.out::println);
+                }
+                break;
+            case "zzz":
+                System.out.println(boxSizeStream().limit(20).collect(Collectors.toList()));
+                break;
+            default:
+                throw new IllegalArgumentException("unknown task: " + task);
         }
     }
 }

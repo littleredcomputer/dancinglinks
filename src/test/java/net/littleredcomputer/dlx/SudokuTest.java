@@ -2,7 +2,6 @@
 package net.littleredcomputer.dlx;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import org.junit.Test;
 
 import java.util.Collections;

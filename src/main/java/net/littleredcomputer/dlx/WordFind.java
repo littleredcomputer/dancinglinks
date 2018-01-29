@@ -51,7 +51,6 @@ public class WordFind {
 
     private List<List<Move>> generatePlacements(String w, int i, int j) {
         final int N = w.length();
-
         List<List<Move>> result = new ArrayList<>();
 
         Consumer<Function<Integer, Move>> m = (Function<Integer, Move> f) ->

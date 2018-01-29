@@ -1,23 +1,16 @@
 // Copyright 2018 Colin Smith. MIT License.
 package net.littleredcomputer.dlx;
 
-import com.google.common.base.Splitter;
-import javafx.util.Pair;
 import org.junit.Test;
 
-import java.util.*;
-import java.util.function.Supplier;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertThat;
 
 public class WordFindTest {
-    private final Splitter wordSplitter = Splitter.on(' ').omitEmptyStrings();
-
     @Test
     public void middleEarth() {
         assertThat(new WordFind(8, 8,

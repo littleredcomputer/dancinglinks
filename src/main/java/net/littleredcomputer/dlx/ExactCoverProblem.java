@@ -2,14 +2,16 @@
 package net.littleredcomputer.dlx;
 
 import com.google.common.base.Splitter;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.Reader;
 import java.io.StringReader;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -24,7 +26,8 @@ import java.util.stream.StreamSupport;
 public class ExactCoverProblem {
     private static final Splitter splitter = Splitter.on(' ').omitEmptyStrings();
     private static final Splitter colonSplitter = Splitter.on(':').omitEmptyStrings();
-    private static final Logger log = LogManager.getLogger(ExactCoverProblem.class);
+    private static final Logger log = LogManager.getFormatterLogger(ExactCoverProblem.class);
+    private final Duration logInterval = Duration.ofMillis(5000);
 
     public enum Strategy {
         FIRST,
@@ -46,7 +49,7 @@ public class ExactCoverProblem {
 
 
     private final int N;  // N and N1 are as in Knuth
-    private final int N1;     // index of last primary item (== N if there are no secondary items)
+    private final int N1;  // index of last primary item (== N if there are no secondary items)
 
     private ExactCoverProblem(Iterable<String> items) {
         List<String> is = new ArrayList<>();
@@ -128,6 +131,10 @@ public class ExactCoverProblem {
         private final int[] dlink;
         private final int[] top;
         private final int[] color;
+        private final int[] vindex; // holds original order in vertical list
+        private final int[] olen = new int[items.size()]; // original length of vertical list
+        private Instant lastLogTime;
+        private final Stopwatch stopwatch = Stopwatch.createUnstarted();
 
         Solutions() {
             for (int i = 1; i < llink.length; ++i) {
@@ -149,6 +156,7 @@ public class ExactCoverProblem {
             dlink = new int[nxnodes];
             top = new int[nxnodes];
             color = new int[nxnodes];
+            vindex = new int[nxnodes];
 
             for (int i = 0; i < ulink.length; ++i) {
                 ulink[i] = dlink[i] = i;
@@ -164,6 +172,7 @@ public class ExactCoverProblem {
                     Option o = os.get(j-1);
                     int ij = o.item;
                     ++len[ij];
+                    vindex[p+j] = len[ij];
 
                     q = ulink[ij];
                     ulink[p+j] = q;
@@ -180,6 +189,8 @@ public class ExactCoverProblem {
                 top[p] = -M;
                 ulink[p] = p-k;
             }
+            System.arraycopy(len, 1, olen, 1, len.length - 1);
+            lastLogTime = Instant.now();
             log.info("tableau created.");
         }
 
@@ -287,6 +298,9 @@ public class ExactCoverProblem {
         private int i = 0;
         private int l = 0;
         private final int[] x = new int[options.size()];
+        private long stepCount = 0;
+        private long solCount = 0;
+        private long logCheckSteps = 1000;
 
         /**
          * Solve the exact cover problem. Announces each solution via supplied consumer and returns true.
@@ -294,8 +308,13 @@ public class ExactCoverProblem {
          */
         @Override
         public boolean tryAdvance(Consumer<? super List<Integer>> action) {
+            stopwatch.start();
             // print();
-            STEP: while (true) {
+            while (true) {
+                ++stepCount;
+                if (stepCount % logCheckSteps == 0) {
+                    maybeReportProgress();
+                }
                 switch (step) {
                     // The cases are numbered in accordance with Algorithm D's steps. The switch
                     // is used to accomplish the go-tos between steps.
@@ -311,6 +330,8 @@ public class ExactCoverProblem {
                                 solution.add(-top[xk]);
                             }
                             step = 8;
+                            ++solCount;
+                            stopwatch.stop();
                             action.accept(solution);
                             return true;
                         }
@@ -336,7 +357,7 @@ public class ExactCoverProblem {
                     case 5:  // Try x[l].
                         if (x[l] == i) {
                             step = 7;
-                            continue STEP;
+                            continue;
                         }
                         for (int p = x[l] + 1; p != x[l]; ) {
                             int j = top[p];
@@ -349,7 +370,7 @@ public class ExactCoverProblem {
                         }
                         ++l;
                         step = 2;
-                        continue STEP;
+                        continue;
                     case 6:  // Try again.
                         for (int p = x[l] - 1; p != x[l]; ) {
                             int j = top[p];
@@ -363,15 +384,36 @@ public class ExactCoverProblem {
                         i = top[x[l]];
                         x[l] = dlink[x[l]];
                         step = 5;
-                        continue STEP;
+                        continue;
                     case 7:  // Backtrack.
                         uncover(i);
                     case 8:  // Leave level l.
-                        if (l == 0) return false;
+                        if (l == 0) {
+                            stopwatch.stop();
+                            return false;
+                        }
                         --l;
                         step = 6;
                 }
             }
+        }
+
+        private void maybeReportProgress() {
+            Instant now = Instant.now();
+            if (Duration.between(lastLogTime, now).compareTo(logInterval) < 0) return;
+            StringBuilder sb = new StringBuilder();
+            double tProduct = 1.0;
+            double completeRatio = 0.0;  // Use 7.2.2.1 (27) to estimate progress.
+            for (int i = 0; i < l; ++i) {
+                final int xi = x[i];
+                final int T = top[xi];
+                tProduct *= olen[T];
+                completeRatio += (vindex[xi] - 1) / tProduct;
+                sb.append(items.get(T)).append(':').append(vindex[xi]).append('/').append(olen[T]).append(' ');
+            }
+            completeRatio += 1.0 / (2.0 * tProduct);  // Final term in equation (27)
+            log.info("%.4f %d nodes %s %.0f/sec %d solutions %s", completeRatio, stepCount, stopwatch, 1000. * stepCount / stopwatch.elapsed().toMillis(), solCount, sb.toString());
+            lastLogTime = now;
         }
 
         @Override
@@ -403,7 +445,7 @@ public class ExactCoverProblem {
      * @param problemDescription textual description of XC problem
      * @return a problem instance from which solutions may be generated
      */
-    public static ExactCoverProblem parseFrom(Reader problemDescription) {
+    public static ExactCoverProblem parseFrom(Readable problemDescription) {
         Scanner s = new Scanner(problemDescription);
         if (!s.hasNextLine()) {
             throw new IllegalArgumentException("no item line");
