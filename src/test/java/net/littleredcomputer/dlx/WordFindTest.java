@@ -3,6 +3,7 @@ package net.littleredcomputer.dlx;
 
 import org.junit.Test;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.stream.Collectors;
@@ -15,6 +16,7 @@ public class WordFindTest {
     public void middleEarth() {
         assertThat(new WordFind(8, 8,
                 Arrays.asList("gandalf", "frodo", "boromir", "merry", "pippin", "aragorn", "samwise", "legolas", "gimli", "gollum", "ring", "sauron"))
+                .setLogInterval(Duration.ofMillis(300))
                 .solutions()
                 .limit(1)
                 .collect(Collectors.toList()), is(Collections.singletonList(

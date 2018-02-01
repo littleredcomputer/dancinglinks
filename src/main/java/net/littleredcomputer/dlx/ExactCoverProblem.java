@@ -27,7 +27,7 @@ public class ExactCoverProblem {
     private static final Splitter splitter = Splitter.on(' ').omitEmptyStrings();
     private static final Splitter colonSplitter = Splitter.on(':').omitEmptyStrings();
     private static final Logger log = LogManager.getFormatterLogger(ExactCoverProblem.class);
-    private final Duration logInterval = Duration.ofMillis(5000);
+    private Duration logInterval = Duration.ofMillis(5000);
 
     public enum Strategy {
         FIRST,
@@ -78,6 +78,11 @@ public class ExactCoverProblem {
         N1 = lastPrimaryItem > 0 ? lastPrimaryItem : N;
         itemIndex = mb.build();
         this.items = ImmutableList.copyOf(is);
+    }
+
+    public ExactCoverProblem setLogInterval(Duration logInterval) {
+        this.logInterval = logInterval;
+        return this;
     }
 
     public Stream<List<Integer>> solutions() {
@@ -191,7 +196,6 @@ public class ExactCoverProblem {
             }
             System.arraycopy(len, 1, olen, 1, len.length - 1);
             lastLogTime = Instant.now();
-            log.info("tableau created.");
         }
 
         private void hide(int p) {
@@ -403,7 +407,7 @@ public class ExactCoverProblem {
             if (Duration.between(lastLogTime, now).compareTo(logInterval) < 0) return;
             StringBuilder sb = new StringBuilder();
             double tProduct = 1.0;
-            double completeRatio = 0.0;  // Use 7.2.2.1 (27) to estimate progress.
+            double completeRatio = 0.0;  // Use 7.2.2.1 (27) to estimate progress
             for (int i = 0; i < l; ++i) {
                 final int xi = x[i];
                 final int T = top[xi];

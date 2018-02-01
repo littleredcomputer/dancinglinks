@@ -1,6 +1,7 @@
 // Copyright 2018 Colin Smith. MIT License.
 package net.littleredcomputer.dlx;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -20,6 +21,7 @@ public class WordFind {
         char c;
     }
     private final List<List<Move>> moves = new ArrayList<>();
+    private Duration logInterval = Duration.ofSeconds(5);
 
     /**
      * Create a word find problem instance: in an m x n grid, position the given words.
@@ -41,12 +43,20 @@ public class WordFind {
         }
     }
 
+    public WordFind setLogInterval(Duration logInterval) {
+        this.logInterval = logInterval;
+        return this;
+    }
+
     /**
      * @return exhaustive stream of solutions of the word find (if any). The effort for any
      * given solution is expended only when that solution is demanded.
      */
     Stream<String> solutions() {
-        return ExactCoverProblem.parseFrom(toProblem()).solutions().map(this::fromSolution);
+        return ExactCoverProblem.parseFrom(toProblem())
+                .setLogInterval(logInterval)
+                .solutions()
+                .map(this::fromSolution);
     }
 
     private List<List<Move>> generatePlacements(String w, int i, int j) {

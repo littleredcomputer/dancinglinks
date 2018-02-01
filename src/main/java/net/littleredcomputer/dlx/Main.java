@@ -4,12 +4,10 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import javafx.util.Pair;
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
+import org.apache.commons.cli.*;
 
 import java.io.*;
+import java.time.Duration;
 import java.util.List;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -26,7 +24,8 @@ public class Main {
                 .addOption("board", true, "sudoku board [1-9.]{81}")
                 .addOption("width", true, "width")
                 .addOption("height", true, "height")
-                .addOption("words", true, "words to fit");
+                .addOption("words", true, "words to fit")
+                .addOption("loginterval", true, "interval between progress log entries in ISO-8601 format");
     }
 
     private static Reader problem(CommandLine cmd) throws FileNotFoundException {
@@ -101,6 +100,7 @@ public class Main {
                     }
                 } else {
                     new WordFind(w, h, words)
+                            .setLogInterval(Duration.parse(cmd.getOptionValue("loginterval", "PT0.1S")))
                             .solutions()
                             .forEach(System.out::println);
                 }
