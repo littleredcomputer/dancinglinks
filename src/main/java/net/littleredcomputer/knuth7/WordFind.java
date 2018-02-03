@@ -1,5 +1,5 @@
 // Copyright 2018 Colin Smith. MIT License.
-package net.littleredcomputer.dlx;
+package net.littleredcomputer.knuth7;
 
 import java.time.Duration;
 import java.util.ArrayList;

@@ -1,4 +1,4 @@
-package net.littleredcomputer.dlx;
+package net.littleredcomputer.knuth7;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;

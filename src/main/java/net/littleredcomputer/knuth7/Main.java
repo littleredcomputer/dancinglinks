@@ -1,4 +1,4 @@
-package net.littleredcomputer.dlx;
+package net.littleredcomputer.knuth7;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
@@ -31,9 +31,7 @@ public class Main {
     private static Reader problem(CommandLine cmd) throws FileNotFoundException {
         if (!cmd.hasOption("problem")) throw new IllegalArgumentException("Must specify --problem");
         String p = cmd.getOptionValue("problem");
-        return new BufferedReader(p.equals("-")
-                ? new InputStreamReader(System.in)
-                : new FileReader(p));
+        return new BufferedReader(p.equals("-") ? new InputStreamReader(System.in) : new FileReader(p));
     }
 
     private static Stream<Pair<Integer, Integer>> boxSizeStream() {

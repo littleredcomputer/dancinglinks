@@ -4,6 +4,8 @@
     <bytecodeTargetLevel>
       <module name="dlx_main" target="1.8" />
       <module name="dlx_test" target="1.8" />
+      <module name="knuth7_main" target="1.8" />
+      <module name="knuth7_test" target="1.8" />
     </bytecodeTargetLevel>
   </component>
 </project>

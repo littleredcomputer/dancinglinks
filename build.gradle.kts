@@ -6,11 +6,10 @@ version = "1.0-SNAPSHOT"
 plugins {
     java
     application
-    // id("com.github.johnrengelman.plugin-shadow") version "2.0.2"
 }
 
 application {
-    mainClassName = "net.littleredcomputer.dlx.Main"
+    mainClassName = "net.littleredcomputer.knuth7.Main"
 }
 
 repositories {

@@ -1,5 +1,5 @@
 // Copyright 2018 Colin Smith. MIT License.
-package net.littleredcomputer.dlx;
+package net.littleredcomputer.knuth7;
 
 import com.google.common.collect.ImmutableList;
 
@@ -62,13 +62,13 @@ public class Sudoku {
     }
 
     /**
-     * Construct a net.littleredcomputer.dlx.Sudoku-solver instance from a board string. The string uses
+     * Construct a Sudoku-solver instance from a board string. The string uses
      * the digits 1-9 in row by row, left to right order. A '.' indicates an
      * empty cell. Other characters are ignored. Knuth's example 28(a) would begin:
      * "..3 .1. ... 415" (etc.)
      *
      * @param boardString board representation with empty spaces recorded as '.'
-     * @return net.littleredcomputer.dlx.Sudoku object. Call solve() on it when you're ready.
+     * @return Sudoku object. Call solutions() on it when you're ready.
      */
     public static Sudoku fromBoardString(String boardString) {
         // A board might look like:
