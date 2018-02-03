@@ -8,6 +8,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.message.FormattedMessage;
 
 import java.io.StringReader;
 import java.time.Duration;
@@ -46,7 +47,6 @@ public class ExactCoverProblem {
     private final List<List<Option>> options = new ArrayList<>();  // integer to option == subset of item indices
     private final List<String> colors = new ArrayList<>();  // integer to color (one-based)
     private final Map<String, Integer> colorIndex = new HashMap<>();
-
 
     private final int N;  // N and N1 are as in Knuth
     private final int N1;  // index of last primary item (== N if there are no secondary items)
@@ -405,18 +405,20 @@ public class ExactCoverProblem {
         private void maybeReportProgress() {
             Instant now = Instant.now();
             if (Duration.between(lastLogTime, now).compareTo(logInterval) < 0) return;
-            StringBuilder sb = new StringBuilder();
-            double tProduct = 1.0;
-            double completeRatio = 0.0;  // Use 7.2.2.1 (27) to estimate progress
-            for (int i = 0; i < l; ++i) {
-                final int xi = x[i];
-                final int T = top[xi];
-                tProduct *= olen[T];
-                completeRatio += (vindex[xi] - 1) / tProduct;
-                sb.append(items.get(T)).append(':').append(vindex[xi]).append('/').append(olen[T]).append(' ');
-            }
-            completeRatio += 1.0 / (2.0 * tProduct);  // Final term in equation (27)
-            log.info("%.4f %d nodes %s %.0f/sec %d solutions %s", completeRatio, stepCount, stopwatch, 1000. * stepCount / stopwatch.elapsed().toMillis(), solCount, sb.toString());
+            log.info(() -> {
+                StringBuilder sb = new StringBuilder();
+                double tProduct = 1.0;
+                double completeRatio = 0.0;  // Use 7.2.2.1 (27) to estimate progress.
+                for (int i = 0; i < l; ++i) {
+                    final int xi = x[i];
+                    final int T = top[xi];
+                    tProduct *= olen[T];
+                    completeRatio += (vindex[xi] - 1) / tProduct;
+                    sb.append(items.get(T)).append(':').append(vindex[xi]).append('/').append(olen[T]).append(' ');
+                }
+                completeRatio += 1.0 / (2.0 * tProduct);  // Final term in equation (27)
+                return new FormattedMessage("%.4f %d nodes %s %.0f/sec %d solutions %s", completeRatio, stepCount, stopwatch, 1000. * stepCount / stopwatch.elapsed().toMillis(), solCount, sb.toString());
+            });
             lastLogTime = now;
         }
 

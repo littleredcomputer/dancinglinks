@@ -67,12 +67,12 @@ public class WordFind {
                 result.add(IntStream.range(0, N).boxed().map(f).collect(Collectors.toList()));
 
         if (j + N <= n) m.accept(k -> new Move(i, j+k, w.charAt(k)));  // W to E
-        if (i + N <= this.m) m.accept(k -> new Move(i+k, j, w.charAt(k)));  // N to S
-        if (j - N >= -1) m.accept(k -> new Move(i, j-k, w.charAt(k)));  // E to W
-        if (i - N >= -1) m.accept(k -> new Move(i-k, j, w.charAt(k)));  // S to N
         if (i + N <= this.m && j + N <= n) m.accept(k -> new Move(i+k, j+k, w.charAt(k)));  // NW to SE
+        if (i + N <= this.m) m.accept(k -> new Move(i+k, j, w.charAt(k)));  // N to S
         if (i - N >= -1 && j - N >= -1) m.accept(k -> new Move(i-k, j-k, w.charAt(k)));  // SE to NW
+        if (j - N >= -1) m.accept(k -> new Move(i, j-k, w.charAt(k)));  // E to W
         if (i - N >= -1 && j + N <= n) m.accept(k -> new Move(i-k, j+k, w.charAt(k)));  // SW to NE
+        if (i - N >= -1) m.accept(k -> new Move(i-k, j, w.charAt(k)));  // S to N
         if (i + N <= this.m && j - N >= -1) m.accept(k -> new Move(i+k, j-k, w.charAt(k)));  // NE to SW
         return result;
     }
@@ -118,12 +118,7 @@ public class WordFind {
         }
         options.forEach(index -> moves.get(index).forEach(m -> board[m.i][m.j] = m.c));
         StringBuilder s = new StringBuilder();
-        for (int i = 0; i < m; ++i) {
-            for (int j = 0; j < n; ++j) {
-                s.append(board[i][j]);
-            }
-            s.append('\n');
-        }
+        IntStream.range(0, m).forEach(i -> s.append(board[i]).append('\n'));
         return s.toString();
     }
 }
