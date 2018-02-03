@@ -1,5 +1,3 @@
-// import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-
 group = "net.littleredcomputer"
 version = "1.0-SNAPSHOT"
 

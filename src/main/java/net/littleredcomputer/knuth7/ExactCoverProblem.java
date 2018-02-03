@@ -3,13 +3,15 @@ package net.littleredcomputer.knuth7;
 
 import com.google.common.base.Splitter;
 import com.google.common.base.Stopwatch;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.message.FormattedMessage;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.io.StreamTokenizer;
 import java.io.StringReader;
 import java.time.Duration;
 import java.time.Instant;
@@ -42,14 +44,34 @@ public class ExactCoverProblem {
         int color;
     }
 
-    private final ImmutableList<String> items;
-    private final ImmutableMap<String, Integer> itemIndex;  // inverse of above mapping
+    private final List<String> items = new ArrayList<>();
     private final List<List<Option>> options = new ArrayList<>();  // integer to option == subset of item indices
     private final List<String> colors = new ArrayList<>();  // integer to color (one-based)
+    private final Map<String, Integer> itemIndex = new HashMap<>();  // inverse of above mapping
     private final Map<String, Integer> colorIndex = new HashMap<>();
 
-    private final int N;  // N and N1 are as in Knuth
-    private final int N1;  // index of last primary item (== N if there are no secondary items)
+    private int N = 0;  // N and N1 are as in Knuth
+    private int N1 = 0;  // index of last primary item (== N if there are no secondary items)
+
+    private ExactCoverProblem() {
+        // Create a dummy item and color, so that the indices to these are one-based
+        items.add("*UNUSED*");
+        colors.add("*UNUSED*");
+    }
+
+    private void addItem(String item) {
+        if (item.equals(";")) {
+            // The ; switches us from recording primary to secondary items.
+            if (N == 0) throw new IllegalArgumentException("There must be at least one primary item");
+            if (N1 != 0) throw new IllegalArgumentException("Tertiary items are not supported");
+            N1 = N;
+            return;
+        }
+        if (itemIndex.containsKey(item)) throw new IllegalArgumentException("duplicate item: " + item);
+        itemIndex.put(item, items.size());
+        items.add(item);
+        ++N;
+    }
 
     private ExactCoverProblem(Iterable<String> items) {
         List<String> is = new ArrayList<>();
@@ -76,8 +98,8 @@ public class ExactCoverProblem {
         if (is.size() <= 1) throw new IllegalArgumentException("There must be at least one item");
         N = is.size() - 1;
         N1 = lastPrimaryItem > 0 ? lastPrimaryItem : N;
-        itemIndex = mb.build();
-        this.items = ImmutableList.copyOf(is);
+        //itemIndex = mb.build();
+        //this.items = ImmutableList.copyOf(is);
     }
 
     public ExactCoverProblem setLogInterval(Duration logInterval) {
@@ -142,6 +164,8 @@ public class ExactCoverProblem {
         private final Stopwatch stopwatch = Stopwatch.createUnstarted();
 
         Solutions() {
+            if (N1 == 0) N1 = N;
+
             for (int i = 1; i < llink.length; ++i) {
                 rlink[i-1] = i;
                 llink[i] = i-1;
@@ -442,6 +466,21 @@ public class ExactCoverProblem {
         return parseFrom(new StringReader(problemDescription));
     }
 
+    private static StreamTokenizer tokenizer(Reader r) {
+        StreamTokenizer t = new StreamTokenizer(r);
+        t.resetSyntax();
+        t.wordChars('a', 'z');
+        t.wordChars('A', 'Z');
+        t.wordChars('0', '9');
+        t.wordChars('-', '-');
+        t.wordChars('+', '+');
+        t.wordChars(',', ',');
+        t.whitespaceChars(0, ' ');
+        t.ordinaryChar(';');
+        t.eolIsSignificant(true);
+        return t;
+    }
+
     /**
      * Parses a complete problem description. The format accepted is that described by Knuth
      * (first line: item names separated by whitespace; each subsequent
@@ -451,14 +490,37 @@ public class ExactCoverProblem {
      * @param problemDescription textual description of XC problem
      * @return a problem instance from which solutions may be generated
      */
-    public static ExactCoverProblem parseFrom(Readable problemDescription) {
-        Scanner s = new Scanner(problemDescription);
-        if (!s.hasNextLine()) {
-            throw new IllegalArgumentException("no item line");
-        }
-        ExactCoverProblem p = new ExactCoverProblem(splitter.split(s.nextLine()));
-        while (s.hasNextLine()) {
-            p.addOption(splitter.split(s.nextLine()));
+    public static ExactCoverProblem parseFrom(Reader problemDescription) {
+        StreamTokenizer tz = tokenizer(problemDescription);
+        ExactCoverProblem p = new ExactCoverProblem();
+        int token;
+        try {
+            while ((token = tz.nextToken()) != StreamTokenizer.TT_EOL) {
+                if (token == ';') p.addItem(";");
+                else if (token == StreamTokenizer.TT_WORD) p.addItem(tz.sval);
+                else throw new IllegalArgumentException("Unexpected token " + tz);
+            }
+            // Now that we're reading options, allow : within a word
+            tz.wordChars(':', ':');
+
+            List<String> option = new ArrayList<>();
+            while (true) {
+                option.clear();
+                while ((token = tz.nextToken()) == StreamTokenizer.TT_WORD) {
+                    option.add(tz.sval);
+                }
+                if (token == StreamTokenizer.TT_EOF) {
+                    p.addOption(option);
+                    break;
+                }
+                if (token == StreamTokenizer.TT_EOL) {
+                    p.addOption(option);
+                    continue;
+                }
+                throw new IllegalArgumentException("Bad token: " + tz);
+            }
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Error parsing problem", e);
         }
         return p;
     }

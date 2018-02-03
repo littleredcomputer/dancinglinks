@@ -47,10 +47,25 @@ public class ExactCoverProblemTest {
         ExactCoverProblem.parseFrom("a b c\na\nd\nb");
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void noColorsInItemNames() { ExactCoverProblem.parseFrom("a b:blue c d\na b\nc d"); }
+
     @Test
     public void simple() {
         assertThat(ExactCoverProblem.parseFrom("a b c\na b\nb c\nc a\na").solutions().collect(Collectors.toList()),
                 is(Collections.singletonList(Arrays.asList(1, 3))));
+    }
+
+    @Test
+    public void simpleWithMultipleAnswers() {
+        assertThat(ExactCoverProblem.parseFrom("a b ; x\n a x\nb \nb ").solutions().collect(Collectors.toList()),
+                is(Arrays.asList(Arrays.asList(0, 1), Arrays.asList(0, 2))));
+    }
+
+    @Test
+    public void simpleWithColorConstraints() {
+        assertThat(ExactCoverProblem.parseFrom("a b ; x\n a x:blue\nb x:green\nb x:blue").solutions().collect(Collectors.toList()),
+                is(Collections.singletonList(Arrays.asList(0, 2))));
     }
 
     @Test
