@@ -73,35 +73,6 @@ public class ExactCoverProblem {
         ++N;
     }
 
-    private ExactCoverProblem(Iterable<String> items) {
-        List<String> is = new ArrayList<>();
-        ImmutableMap.Builder<String, Integer> mb = new ImmutableMap.Builder<>();
-        Set<String> itemsSeen = new HashSet<>();
-        // Create a dummy item and color, so that the indices to these are one-based
-        is.add("*UNUSED*");
-        colors.add("*UNUSED*");
-        boolean secondaryItems = false;
-        int lastPrimaryItem = 0;
-        for (String item : items) {
-            if (item.equals(";")) {
-                if (secondaryItems) throw new IllegalArgumentException("tertiary items are not supported");
-                if (is.size() < 2) throw new IllegalArgumentException("there must be at least one primary item");
-                lastPrimaryItem = is.size() - 1;
-                secondaryItems = true;
-                continue;
-            }
-            if (itemsSeen.contains(item)) throw new IllegalArgumentException("duplicate item: " + item);
-            itemsSeen.add(item);
-            mb.put(item, is.size());
-            is.add(item);
-        }
-        if (is.size() <= 1) throw new IllegalArgumentException("There must be at least one item");
-        N = is.size() - 1;
-        N1 = lastPrimaryItem > 0 ? lastPrimaryItem : N;
-        //itemIndex = mb.build();
-        //this.items = ImmutableList.copyOf(is);
-    }
-
     public ExactCoverProblem setLogInterval(Duration logInterval) {
         this.logInterval = logInterval;
         return this;
@@ -466,6 +437,11 @@ public class ExactCoverProblem {
         return parseFrom(new StringReader(problemDescription));
     }
 
+    /**
+     * Produces a StreamTokenizer adapted to the input language for XC problems.
+     * @param r the input which the returned tokenizer will consume
+     * @return the new StreamTokenizer instance
+     */
     private static StreamTokenizer tokenizer(Reader r) {
         StreamTokenizer t = new StreamTokenizer(r);
         t.resetSyntax();
@@ -485,7 +461,7 @@ public class ExactCoverProblem {
      * Parses a complete problem description. The format accepted is that described by Knuth
      * (first line: item names separated by whitespace; each subsequent
      * line is one option, containing a subset of items). The first line
-     * may contain one semicolon (as a word) which separates primary from secondary
+     * may contain one semicolon which separates primary from secondary
      * options.
      * @param problemDescription textual description of XC problem
      * @return a problem instance from which solutions may be generated
@@ -502,7 +478,6 @@ public class ExactCoverProblem {
             }
             // Now that we're reading options, allow : within a word
             tz.wordChars(':', ':');
-
             List<String> option = new ArrayList<>();
             while (true) {
                 option.clear();
@@ -520,7 +495,7 @@ public class ExactCoverProblem {
                 throw new IllegalArgumentException("Bad token: " + tz);
             }
         } catch (IOException e) {
-            throw new IllegalArgumentException("Error parsing problem", e);
+            throw new IllegalArgumentException("Parse error", e);
         }
         return p;
     }
