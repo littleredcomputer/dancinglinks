@@ -58,15 +58,16 @@ public class SATProblem {
         for (; c < 2 * nVariables + 2; ++c) {
             F[c] = B[c] = c;
         }
-        // Process clauses in reverse order, and literals in descending order of variable (because Knuth does)
-        for (int ci = clauses.size() - 1; ci >= 0; --ci) {
-            int[] clause = clauses.get(ci);
-            START[ci + 1] = c;
-            SIZE[ci + 1] = clause.length;
+        // Process clauses in reverse order, and literals in descending order of variable (because Knuth does).
+        // c is the index of the next free slot in the (L, F, B, C) arrays. ciz is the zero-based clause index.
+        for (int ciz = clauses.size() - 1; ciz >= 0; --ciz) {
+            int[] clause = clauses.get(ciz);
+            START[ciz + 1] = c;
+            SIZE[ciz + 1] = clause.length;
             for (int k = clause.length - 1; k >= 0; --k) {
                 int l = clause[k];
                 L[c] = l;
-                C[c] = ci + 1;
+                C[c] = ciz + 1;
                 ++C[l];
                 int f = F[l];
                 F[l] = c;

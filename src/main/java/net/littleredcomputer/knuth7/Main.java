@@ -2,13 +2,16 @@ package net.littleredcomputer.knuth7;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
+import javafx.scene.paint.Stop;
 import javafx.util.Pair;
 import org.apache.commons.cli.*;
 
 import java.io.*;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -58,13 +61,14 @@ public class Main {
         if (!cmd.hasOption("task")) throw new IllegalArgumentException("Must specify --task");
         String task = cmd.getOptionValue("task");
         switch (task) {
-            case "exactcover":
+            case "exactcover": {
                 ExactCoverProblem p = ExactCoverProblem.parseFrom(problem(cmd));
                 p.solutions().map(p::optionsToItems).map(s -> s.stream().map(spaceJoiner::join)).forEach(s -> {
                     s.forEach(System.out::println);
                     System.out.println();
                 });
                 break;
+            }
             case "sudoku":
                 Sudoku.fromBoardString(cmd.getOptionValue("board")).solutions().forEach(System.out::println);
                 break;
@@ -103,9 +107,23 @@ public class Main {
                             .forEach(System.out::println);
                 }
                 break;
-            case "zzz":
-                System.out.println(boxSizeStream().limit(20).collect(Collectors.toList()));
+            case "sat": {
+                SATProblem p = SATProblem.parseFrom(problem(cmd));
+                Stopwatch sw = Stopwatch.createStarted();
+                Optional<boolean[]> outcome = p.algorithmA();
+                sw.stop();
+                System.out.println("c " + sw);
+                if (outcome.isPresent()) {
+                    System.out.println("s SATISFIABLE");
+                    System.out.print("v ");
+                    boolean[] bs = outcome.get();
+                    for (int i = 0; i < bs.length; ++i) System.out.printf("%d ", bs[i] ? i+1 : -i-1);
+                    System.out.println("0");
+                } else {
+                    System.out.println("s UNSATISFIABLE");
+                }
                 break;
+            }
             default:
                 throw new IllegalArgumentException("unknown task: " + task);
         }
