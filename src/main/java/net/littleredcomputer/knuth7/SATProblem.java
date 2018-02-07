@@ -188,6 +188,51 @@ public class SATProblem {
         }
     }
 
+    public Optional<boolean[]> algorithmB() {
+        int[] m = new int[nVariables + 1];
+        int[] START = new int[clauses.size() + 1];
+        int[] L = new int[nLiterals];
+        int[] W = new int[0]; // XXX
+
+
+        int c = 0;
+        for (int ciz = clauses.size() - 1; ciz >= 0; --ciz) {
+            int[] clause = clauses.get(ciz);
+            START[ciz+1] = c;
+        }
+
+        int d = 1;
+        int l = 0;  // XXX
+        int state = 2;
+
+        while (true) {
+            switch (state) {
+                case 2:  // Rejoice or choose.
+                    if (d > nVariables) return Optional.of(new boolean[] {});
+                    m[d] = (W[2*d]==0 || W[2*d+1] != 0) ? 1 : 0;
+                    l = 2*d + m[d];
+                case 3:
+                case 4:  // Advance.
+                    W[l^1] = 0;
+                    ++d;
+                    state = 2;
+                    continue;
+                case 5:  // Try again.
+                    if (m[d] < 2) {
+                        m[d] = 3 - m[d];
+                        l = 2*d + (m[d] & 1);
+                        state = 3;
+                        continue;
+                    }
+                case 6:  // Backtrack.
+                    if (d == 1) return Optional.empty();
+                    --d;
+                    state = 5;
+                    continue;
+            }
+        }
+    }
+
     public static SATProblem parseFrom(Reader r) {
         BufferedReader br = new BufferedReader(r);
         int nVar;
