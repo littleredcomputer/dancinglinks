@@ -138,7 +138,7 @@ public class SATProblemTest {
         return IntStream.range(1, 1000)
                 .filter(i -> !solver.apply(SATProblem.parseFrom(new StringReader(waerdenProblem(j, k, i)))).isPresent())
                 .findFirst()
-                .getAsInt();
+                .orElseThrow(() -> new IllegalStateException("did not establish Waerden value"));
     }
 
     // Following are a collection of values from the table of W(j, k) given on p. 5 of Fascicle 6
@@ -235,7 +235,7 @@ public class SATProblemTest {
             Optional<boolean[]> solution = p.algorithmB();
             if (i % 4 == 0 || i % 4 == 3) {
                 assertThat(solution, isPresent());
-                assertThat(p.evaluate(solution.get()), is(true));
+                assertThat(p.evaluate(solution.orElse(null)), is(true));
             } else {
                 assertThat(solution, isEmpty());
             }

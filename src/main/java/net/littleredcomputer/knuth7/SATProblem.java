@@ -272,7 +272,7 @@ public class SATProblem {
                         }
                     }
                 }
-                case 4:  // Advance.
+                /* case 4: */  // Advance.
                     W[l^1] = 0;
                     ++d;
                     state = 2;
@@ -288,7 +288,6 @@ public class SATProblem {
                     if (d == 1) return Optional.empty();
                     --d;
                     state = 5;
-                    continue;
             }
         }
     }

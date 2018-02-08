@@ -3,7 +3,6 @@ package net.littleredcomputer.knuth7;
 
 import com.google.common.base.Splitter;
 import com.google.common.base.Stopwatch;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -472,9 +471,16 @@ public class ExactCoverProblem {
         int token;
         try {
             while ((token = tz.nextToken()) != StreamTokenizer.TT_EOL) {
-                if (token == ';') p.addItem(";");
-                else if (token == StreamTokenizer.TT_WORD) p.addItem(tz.sval);
-                else throw new IllegalArgumentException("Unexpected token " + tz);
+                switch (token) {
+                    case ';':
+                        p.addItem(";");
+                        break;
+                    case StreamTokenizer.TT_WORD:
+                        p.addItem(tz.sval);
+                        break;
+                    default:
+                        throw new IllegalArgumentException("Unexpected token " + tz);
+                }
             }
             // Now that we're reading options, allow : within a word
             tz.wordChars(':', ':');
