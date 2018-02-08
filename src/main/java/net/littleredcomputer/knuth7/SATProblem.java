@@ -1,7 +1,12 @@
 package net.littleredcomputer.knuth7;
 
-import java.io.*;
-import java.util.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.Reader;
+import java.io.StreamTokenizer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -16,10 +21,10 @@ public class SATProblem {
         this.nVariables = nVariables;
     }
 
-
     private int nClauses() {
         return clauses.size();
     }
+    public int nVariables() { return nVariables; }
 
     private static StreamTokenizer tokenizer(Reader r) {
         StreamTokenizer t = new StreamTokenizer(r);
@@ -43,6 +48,25 @@ public class SATProblem {
         int[] ls = literals.stream().map(SATProblem::encodeLiteral).sorted().mapToInt(i -> i).toArray();
         clauses.add(ls);
         nLiterals += ls.length;
+    }
+
+    private Optional<boolean[]> solutionFromSteps(int[] steps) {
+        // Success: convert the move notation into a satisfying assignment.
+        boolean[] solution = new boolean[nVariables];
+        for (int i = 1; i < steps.length; ++i) solution[i-1] = (steps[i] & 1) == 0;
+        return Optional.of(solution);
+    }
+
+    public boolean evaluate(boolean[] solution) {
+        CLAUSE: for (int i = 1; i < clauses.size(); ++i) {
+            int[] clause = clauses.get(i);
+            for (int literal : clause) {
+                // One true literal in the clause is enough to make the whole clause true.
+                if (solution[(literal>>1) - 1] == ((literal & 1) == 0)) continue CLAUSE;
+            }
+            return false;  // Any false clause is enough to spoil satisfaction.
+        }
+        return true;  // No clause was falsified by any literal.
     }
 
     public Optional<boolean[]> algorithmA() {
@@ -104,10 +128,7 @@ public class SATProblem {
                     // System.out.println("move " + Arrays.toString(Arrays.copyOfRange(m, 1, d+1)));
                     // System.out.println("l " + l + " C[l] " + C[l] + " a " + a);
                     if (C[l] == a) {
-                        // Success: convert the move notation into a satisfying assignment.
-                        boolean[] solution = new boolean[nVariables];
-                        for (int i = 1; i <= nVariables; ++i) solution[i-1] = (m[i] & 1) == 0;
-                        return Optional.of(solution);
+                        return solutionFromSteps(m);
                     }
                 case 3: {  // Remove -l.
                     int p = F[l ^ 1];
@@ -192,26 +213,65 @@ public class SATProblem {
         int[] m = new int[nVariables + 1];
         int[] START = new int[clauses.size() + 1];
         int[] L = new int[nLiterals];
-        int[] W = new int[0]; // XXX
-
+        int[] W = new int[2 * nVariables + 2];  // one for each literal and its negation, one-based
+        int[] LINK = new int[clauses.size() + 1];
 
         int c = 0;
         for (int ciz = clauses.size() - 1; ciz >= 0; --ciz) {
             int[] clause = clauses.get(ciz);
             START[ciz+1] = c;
+            LINK[ciz+1] = W[clause[0]];
+            W[clause[0]] = ciz+1;
+            System.arraycopy(clause, 0, L, c, clause.length);
+            c += clause.length;
         }
+        START[0] = L.length;
+
+//        IntFunction<String> ø = i -> String.format("%4d", i);
+//        BiConsumer<String, int[]> π = (String s, int[] v) -> System.out.println(s + Arrays.stream(v).mapToObj(ø).collect(Collectors.joining()));
+//        System.out.println("  " + IntStream.range(0, nLiterals).mapToObj(ø).collect(Collectors.joining()));
+//        π.accept("L:", L);
+//        π.accept("L:", L);
+//        π.accept("S:", START);
+//        π.accept("W:", W);
+//        π.accept("k:", LINK);
 
         int d = 1;
         int l = 0;  // XXX
         int state = 2;
 
-        while (true) {
+        STEP: while (true) {
             switch (state) {
                 case 2:  // Rejoice or choose.
-                    if (d > nVariables) return Optional.of(new boolean[] {});
-                    m[d] = (W[2*d]==0 || W[2*d+1] != 0) ? 1 : 0;
+                    if (d > nVariables) return solutionFromSteps(m);
+                    m[d] = (W[2*d] == 0 || W[2*d+1] != 0) ? 1 : 0;
+                    // System.out.println("move " + Arrays.toString(Arrays.copyOfRange(m, 1, d+1)));
                     l = 2*d + m[d];
-                case 3:
+                case 3: {  // Remove -l if possible
+                    for (int j = W[l^1]; j != 0; ) {
+                        int i = START[j];
+                        int ii = START[j-1];
+                        int jj = LINK[j];
+                        int k;
+                        for (k = i+1; k < ii; ++k) {
+                            int ll = L[k];
+                            if ((ll >> 1) > d || (ll + m[ll >> 1]) % 2 == 0) {
+                                L[i] = ll;
+                                L[k] = l^1;
+                                LINK[j] = W[ll];
+                                W[ll] = j;
+                                j = jj;
+                                break;
+
+                            }
+                        }
+                        if (k == ii) {
+                            W[l^1] = j;
+                            state = 5;
+                            continue STEP;
+                        }
+                    }
+                }
                 case 4:  // Advance.
                     W[l^1] = 0;
                     ++d;

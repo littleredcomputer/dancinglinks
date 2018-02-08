@@ -13,9 +13,9 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresentAndIs;
+import static com.github.npathai.hamcrestopt.OptionalMatchers.*;
 import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertThat;
 
 public class SATProblemTest {
 
@@ -51,6 +51,12 @@ public class SATProblemTest {
     }
 
     @Test
+    public void ex7_B() {
+        assertThat(SATProblem.parseFrom(new StringReader("p cnf 4 7\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0")).algorithmB(),
+                isPresentAndIs(new boolean[]{false, true, false, true}));
+    }
+
+    @Test
     public void ex6() {
         assertThat(SATProblem.parseFrom(new StringReader("p cnf 4 8\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0 -4 1 -2 0")).algorithmA(),
                 is(Optional.empty()));
@@ -68,19 +74,22 @@ public class SATProblemTest {
 
     @Test
     public void zebra() {
-        assertThat(fromResource("zebra.cnf").algorithmA().map(this::toBinaryString),
-                isPresentAndIs("00100000011000000010010000000110000000100100000100100000100000010001000000110000010000010000010000010000110000000100010001000001000000001010010000011010010"));
+        SATProblem p = fromResource("zebra.cnf");
+        assertThat(p.algorithmA().map(p::evaluate), isPresentAndIs(true));
+        assertThat(p.algorithmB().map(p::evaluate), isPresentAndIs(true));
     }
 
     @Test
     public void hole6() {
         assertThat(fromResource("hole6.cnf").algorithmA(), is(Optional.empty()));
+        assertThat(fromResource("hole6.cnf").algorithmB(), is(Optional.empty()));
     }
 
-    @Test
     public void quinn() {
-        assertThat(fromResource("quinn.cnf").algorithmA().map(this::toBinaryString),
-                isPresentAndIs("1010111110111001"));
+        SATProblem p = fromResource("quinn.cnf");
+        assertThat(p.algorithmA().map(this::toBinaryString), isPresentAndIs("1010111110111001"));
+        assertThat(p.algorithmB().map(this::toBinaryString), isPresentAndIs("1010111110111001"));
+        assertThat(p.algorithmA().map(p::evaluate), isPresentAndIs(true));
     }
 
     /**
@@ -123,24 +132,32 @@ public class SATProblemTest {
         return "c waerden(" + j + ", " + k + ", " + n + ")\np cnf " + n + ' ' + clauseCount + '\n' + clauses;
     }
 
-    private int waerden(int j, int k) {
+    private int waerden(int j, int k, Function<SATProblem, Optional<boolean[]>> solver) {
         // waerdenProblem(j, k, n) is satisfiable iff n < W(j, k). Compute W by finding the smallest
         // integer for which the associated problem is unsatisfiable.
         return IntStream.range(1, 1000)
-                .filter(i -> !SATProblem.parseFrom(new StringReader(waerdenProblem(j, k, i))).algorithmA().isPresent())
+                .filter(i -> !solver.apply(SATProblem.parseFrom(new StringReader(waerdenProblem(j, k, i)))).isPresent())
                 .findFirst()
                 .getAsInt();
     }
 
     // Following are a collection of values from the table of W(j, k) given on p. 5 of Fascicle 6
-    @Test public void w3_3() { assertThat(waerden(3, 3), is(9)); }
-    @Test public void w3_4() { assertThat(waerden(3, 4), is(18)); }
-    @Test public void w4_3() { assertThat(waerden(4, 3), is(18)); }
-    @Test public void w4_4() { assertThat(waerden(4, 4), is(35)); }
-    @Test public void w3_6() { assertThat(waerden(3, 6), is(32)); }
-    @Test public void w4_5() { assertThat(waerden(4, 5), is(55)); }
-    @Test public void w5_4() { assertThat(waerden(5, 4), is(55)); }
-    @Test public void w6_3() { assertThat(waerden(6, 3), is(32)); }
+    @Test public void w3_3A() { assertThat(waerden(3, 3, SATProblem::algorithmA), is(9)); }
+    @Test public void w3_4A() { assertThat(waerden(3, 4, SATProblem::algorithmA), is(18)); }
+    @Test public void w4_3A() { assertThat(waerden(4, 3, SATProblem::algorithmA), is(18)); }
+    @Test public void w4_4A() { assertThat(waerden(4, 4, SATProblem::algorithmA), is(35)); }
+    @Test public void w3_6A() { assertThat(waerden(3, 6, SATProblem::algorithmA), is(32)); }
+    @Test public void w4_5A() { assertThat(waerden(4, 5, SATProblem::algorithmA), is(55)); }
+    @Test public void w5_4A() { assertThat(waerden(5, 4, SATProblem::algorithmA), is(55)); }
+    @Test public void w6_3A() { assertThat(waerden(6, 3, SATProblem::algorithmA), is(32)); }
+    @Test public void w3_3B() { assertThat(waerden(3, 3, SATProblem::algorithmB), is(9)); }
+    @Test public void w3_4B() { assertThat(waerden(3, 4, SATProblem::algorithmB), is(18)); }
+    @Test public void w4_3B() { assertThat(waerden(4, 3, SATProblem::algorithmB), is(18)); }
+    @Test public void w4_4B() { assertThat(waerden(4, 4, SATProblem::algorithmB), is(35)); }
+    @Test public void w3_6B() { assertThat(waerden(3, 6, SATProblem::algorithmB), is(32)); }
+    @Test public void w4_5B() { assertThat(waerden(4, 5, SATProblem::algorithmB), is(55)); }
+    @Test public void w5_4B() { assertThat(waerden(5, 4, SATProblem::algorithmB), is(55)); }
+    @Test public void w6_3B() { assertThat(waerden(6, 3, SATProblem::algorithmB), is(32)); }
 
     /**
      * Write the clauses corresponding to S1(y_i...) where the y_i correspond
@@ -212,22 +229,54 @@ public class SATProblemTest {
     }
 
     @Test
+    public void langfordB() {
+        for (int i = 2; i < 10; ++i) {
+            SATProblem p = SATProblem.parseFrom(new StringReader(langfordProblem(i)));
+            Optional<boolean[]> solution = p.algorithmB();
+            if (i % 4 == 0 || i % 4 == 3) {
+                assertThat(solution, isPresent());
+                assertThat(p.evaluate(solution.get()), is(true));
+            } else {
+                assertThat(solution, isEmpty());
+            }
+        }
+    }
+
+    @Test
     public void langford3() {
         assertThat(SATProblem.parseFrom(new StringReader(langfordProblem(3))).algorithmA().map(this::toBinaryString), isPresentAndIs("001010001"));
+        assertThat(SATProblem.parseFrom(new StringReader(langfordProblem(3))).algorithmB().map(this::toBinaryString), isPresentAndIs("001010001"));
     }
 
     @Test
     public void langford4() {
         assertThat(SATProblem.parseFrom(new StringReader(langfordProblem(4))).algorithmA().map(this::toBinaryString), isPresentAndIs("000010100000100001"));
+        assertThat(SATProblem.parseFrom(new StringReader(langfordProblem(4))).algorithmB().map(this::toBinaryString), isPresentAndIs("000010100000100001"));
     }
 
-    // Too hard for algorithm A
-    //    @Test
-    //    public void dubois20() {
-    //        assertThat(SATProblem.parseFrom(new InputStreamReader(this.getClass().getClassLoader().getResourceAsStream("dubois20.cnf"))).algorithmA(),
-    //                is(Optional.empty()));
-    //
-    //    }
+    @Test
+    public void unsatEvalsToFalse() {
+        SATProblem l9 = SATProblem.parseFrom(new StringReader(langfordProblem(9)));
+        assertThat(l9.algorithmA().isPresent(), is(false));
+        assertThat(l9.algorithmB().isPresent(), is(false));
+        final int N = l9.nVariables();
+        boolean[] v = new boolean[N];
+        // Langford(9) is unsatisfiable, since 9 = 1 (mod 4). Prove every bit pattern evaluates to false.
+        for (int i = 0; i < 1 << N; ++i) {
+            for (int b = 0; b < N; ++b) {
+                v[b] = ((i >> b) & 1) == 1;
+            }
+            assertThat(l9.evaluate(v), is(false));
+        }
+    }
 
+    //Too hard for algorithm A or B, at least as a unit test
+
+//    @Test
+//    public void dubois20() {
+//        assertThat(SATProblem.parseFrom(new InputStreamReader(this.getClass().getClassLoader().getResourceAsStream("dubois20.cnf"))).algorithmA(),
+//                is(Optional.empty()));
+//
+//    }
 }
 
