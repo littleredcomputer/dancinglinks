@@ -4,15 +4,18 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.IntUnaryOperator;
+import java.util.stream.Collectors;
 
-public class SATAlgorithmD {
-    final SATProblem problem;
+public class SATAlgorithmD extends AbstractSATSolver {
     SATAlgorithmD(SATProblem problem) {
-        this.problem = problem;
+        super("D", problem);
     }
 
-    Optional<boolean[]> solve() {
+    @Override
+    public Optional<boolean[]> solve() {
+        start();
         final int nVariables = problem.nVariables();
+        int stepCount = 0;
         int[] m = new int[nVariables + 1];
         int[] x = new int[nVariables + 1];
         int[] H = new int[nVariables + 1];
@@ -67,6 +70,8 @@ public class SATAlgorithmD {
         int state = 2;
         boolean debug = false;
         while(true) {
+            ++stepCount;
+            if (stepCount % logCheckSteps == 0) maybeReportProgress(stepCount, m);
             // Algorithm D. The case state labels correspond to Knuth's numbering of the steps.
             // Step 1 is already complete, above.
             switch (state) {

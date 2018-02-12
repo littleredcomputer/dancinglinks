@@ -3,12 +3,12 @@ package net.littleredcomputer.knuth7;
 import java.util.List;
 import java.util.Optional;
 
-public class SATAlgorithmB {
-    private final SATProblem problem;
+public class SATAlgorithmB extends AbstractSATSolver {
     SATAlgorithmB(SATProblem p) {
-        this.problem = p;
+        super("B", p);
     }
 
+    @Override
     public Optional<boolean[]> solve() {
         final int nVariables = problem.nVariables();
         final int nClauses = problem.nClauses();

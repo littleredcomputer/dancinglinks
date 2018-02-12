@@ -6,13 +6,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-public class SATAlgorithmA {
-    private final SATProblem problem;
+public class SATAlgorithmA extends AbstractSATSolver {
 
     SATAlgorithmA(SATProblem p) {
-        this.problem = p;
+        super("A", p);
     }
 
+    @Override
     public Optional<boolean[]> solve() {
         final int nVariables = problem.nVariables();
         final int nClauses = problem.nClauses();
