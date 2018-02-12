@@ -26,7 +26,6 @@ import java.util.stream.StreamSupport;
  * of TAOCP volume 4.
  */
 public class ExactCoverProblem {
-    private static final Splitter splitter = Splitter.on(' ').omitEmptyStrings();
     private static final Splitter colonSplitter = Splitter.on(':').omitEmptyStrings();
     private static final Logger log = LogManager.getFormatterLogger(ExactCoverProblem.class);
     private Duration logInterval = Duration.ofMillis(5000);

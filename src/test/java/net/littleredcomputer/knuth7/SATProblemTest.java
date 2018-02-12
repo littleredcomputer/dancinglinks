@@ -1,5 +1,6 @@
 package net.littleredcomputer.knuth7;
 
+import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 
 import java.io.InputStreamReader;
@@ -44,22 +45,24 @@ public class SATProblemTest {
         SATProblem.parseFrom(new StringReader("c unclosed clause\np cnf 3 2\n1 2 3 0\n2 3 -1 0\n-2 -3"));
     }
 
-    @Test
-    public void ex7() {
-        assertThat(SATProblem.parseFrom(new StringReader("p cnf 4 7\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0")).algorithmA(),
-                isPresentAndIs(new boolean[]{false, true, false, true}));
-    }
+    private static String ex7 = "p cnf 4 7\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0";
+    private static String ex6 = "p cnf 4 8\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0 -4 1 -2 0";
+    private static List<Function<SATProblem, Optional<boolean[]>>> algorithms = ImmutableList.of(
+            SATProblem::algorithmA,
+            SATProblem::algorithmB,
+            SATProblem::algorithmD
+    );
 
     @Test
-    public void ex7_B() {
-        assertThat(SATProblem.parseFrom(new StringReader("p cnf 4 7\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0")).algorithmB(),
-                isPresentAndIs(new boolean[]{false, true, false, true}));
-    }
+    public void ex7() {
+        SATProblem p = SATProblem.parseFrom(new StringReader(ex7));
+        algorithms.forEach(a -> assertThat(a.apply(p), isPresentAndIs(new boolean[]{false, true, false, true})));
+        }
 
     @Test
     public void ex6() {
-        assertThat(SATProblem.parseFrom(new StringReader("p cnf 4 8\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0 -4 1 -2 0")).algorithmA(),
-                is(Optional.empty()));
+        SATProblem p = SATProblem.parseFrom(new StringReader(ex6));
+        algorithms.forEach(a -> assertThat(a.apply(p), isEmpty()));
     }
 
     private SATProblem fromResource(String name) {
@@ -75,21 +78,18 @@ public class SATProblemTest {
     @Test
     public void zebra() {
         SATProblem p = fromResource("zebra.cnf");
-        assertThat(p.algorithmA().map(p::evaluate), isPresentAndIs(true));
-        assertThat(p.algorithmB().map(p::evaluate), isPresentAndIs(true));
+        algorithms.forEach(a -> assertThat(a.apply(p).map(p::evaluate), isPresentAndIs(true)));
     }
 
     @Test
     public void hole6() {
-        assertThat(fromResource("hole6.cnf").algorithmA(), is(Optional.empty()));
-        assertThat(fromResource("hole6.cnf").algorithmB(), is(Optional.empty()));
+        SATProblem p = fromResource("hole6.cnf");
+        algorithms.forEach(a -> assertThat(a.apply(p), isEmpty()));
     }
 
     public void quinn() {
         SATProblem p = fromResource("quinn.cnf");
-        assertThat(p.algorithmA().map(this::toBinaryString), isPresentAndIs("1010111110111001"));
-        assertThat(p.algorithmB().map(this::toBinaryString), isPresentAndIs("1010111110111001"));
-        assertThat(p.algorithmA().map(p::evaluate), isPresentAndIs(true));
+        algorithms.forEach(a -> assertThat(a.apply(p).map(p::evaluate), isPresentAndIs(true)));
     }
 
     /**
@@ -150,6 +150,7 @@ public class SATProblemTest {
     @Test public void w4_5A() { assertThat(waerden(4, 5, SATProblem::algorithmA), is(55)); }
     @Test public void w5_4A() { assertThat(waerden(5, 4, SATProblem::algorithmA), is(55)); }
     @Test public void w6_3A() { assertThat(waerden(6, 3, SATProblem::algorithmA), is(32)); }
+
     @Test public void w3_3B() { assertThat(waerden(3, 3, SATProblem::algorithmB), is(9)); }
     @Test public void w3_4B() { assertThat(waerden(3, 4, SATProblem::algorithmB), is(18)); }
     @Test public void w4_3B() { assertThat(waerden(4, 3, SATProblem::algorithmB), is(18)); }
@@ -158,6 +159,15 @@ public class SATProblemTest {
     @Test public void w4_5B() { assertThat(waerden(4, 5, SATProblem::algorithmB), is(55)); }
     @Test public void w5_4B() { assertThat(waerden(5, 4, SATProblem::algorithmB), is(55)); }
     @Test public void w6_3B() { assertThat(waerden(6, 3, SATProblem::algorithmB), is(32)); }
+
+    @Test public void w3_3D() { assertThat(waerden(3, 3, SATProblem::algorithmD), is(9)); }
+    @Test public void w3_4D() { assertThat(waerden(3, 4, SATProblem::algorithmD), is(18)); }
+    @Test public void w4_3D() { assertThat(waerden(4, 3, SATProblem::algorithmD), is(18)); }
+    @Test public void w4_4D() { assertThat(waerden(4, 4, SATProblem::algorithmD), is(35)); }
+    @Test public void w3_6D() { assertThat(waerden(3, 6, SATProblem::algorithmD), is(32)); }
+    @Test public void w4_5D() { assertThat(waerden(4, 5, SATProblem::algorithmD), is(55)); }
+    @Test public void w5_4D() { assertThat(waerden(5, 4, SATProblem::algorithmD), is(55)); }
+    @Test public void w6_3D() { assertThat(waerden(6, 3, SATProblem::algorithmD), is(32)); }
 
     /**
      * Write the clauses corresponding to S1(y_i...) where the y_i correspond
@@ -221,44 +231,30 @@ public class SATProblemTest {
         // The langford problem is solvable iff i mod 4 in {0, 3}. When it is solvable, we should expect the
         // number of true variables to be equal to the problem size (i.e., each digit receives exactly one
         // (dual) placement). When i mod 4 in {1, 2}, the solver should refute the problem instance.
-        Stream<Optional<Integer>> expected = range.get().mapToObj(i -> i % 4 == 0 || i % 4 == 3 ? Optional.of(i) : Optional.empty());
-        Stream<Optional<Integer>> observed = range.get().mapToObj(i -> SATProblem.parseFrom(new StringReader(langfordProblem(i)))
-                .algorithmA()
-                .map(countTrueBits));
-        assertThat(expected.collect(Collectors.toList()), is(observed.collect(Collectors.toList())));
+        List<Optional<Integer>> expected = range.get().mapToObj(i -> i % 4 == 0 || i % 4 == 3 ? Optional.of(i) : Optional.<Integer>empty()).collect(Collectors.toList());
+        algorithms.forEach(a -> {
+            Stream<Optional<Integer>> observed = range.get().mapToObj(i -> a.apply(SATProblem.parseFrom(new StringReader(langfordProblem(i)))).map(countTrueBits));
+            assertThat(observed.collect(Collectors.toList()), is(expected));
+        });
     }
 
-    @Test
-    public void langfordB() {
-        for (int i = 2; i < 10; ++i) {
-            SATProblem p = SATProblem.parseFrom(new StringReader(langfordProblem(i)));
-            Optional<boolean[]> solution = p.algorithmB();
-            if (i % 4 == 0 || i % 4 == 3) {
-                assertThat(solution, isPresent());
-                assertThat(p.evaluate(solution.orElse(null)), is(true));
-            } else {
-                assertThat(solution, isEmpty());
-            }
-        }
-    }
-
+    // These are redundant but it's useful to have a few small tests lying around for debugging
     @Test
     public void langford3() {
-        assertThat(SATProblem.parseFrom(new StringReader(langfordProblem(3))).algorithmA().map(this::toBinaryString), isPresentAndIs("001010001"));
-        assertThat(SATProblem.parseFrom(new StringReader(langfordProblem(3))).algorithmB().map(this::toBinaryString), isPresentAndIs("001010001"));
+        SATProblem p = SATProblem.parseFrom(new StringReader(langfordProblem(3)));
+        algorithms.forEach(a -> assertThat(a.apply(p).map(this::toBinaryString), isPresentAndIs("001010001")));
     }
 
     @Test
     public void langford4() {
-        assertThat(SATProblem.parseFrom(new StringReader(langfordProblem(4))).algorithmA().map(this::toBinaryString), isPresentAndIs("000010100000100001"));
-        assertThat(SATProblem.parseFrom(new StringReader(langfordProblem(4))).algorithmB().map(this::toBinaryString), isPresentAndIs("000010100000100001"));
+        SATProblem p = SATProblem.parseFrom(new StringReader(langfordProblem(4)));
+        algorithms.forEach(a -> assertThat(a.apply(p).map(this::toBinaryString), isPresentAndIs("000010100000100001")));
     }
 
     @Test
     public void unsatEvalsToFalse() {
         SATProblem l9 = SATProblem.parseFrom(new StringReader(langfordProblem(9)));
-        assertThat(l9.algorithmA().isPresent(), is(false));
-        assertThat(l9.algorithmB().isPresent(), is(false));
+        algorithms.forEach(a -> assertThat(a.apply(l9), isEmpty()));
         final int N = l9.nVariables();
         boolean[] v = new boolean[N];
         // Langford(9) is unsatisfiable, since 9 = 1 (mod 4). Prove every bit pattern evaluates to false.
