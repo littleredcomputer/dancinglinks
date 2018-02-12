@@ -1,7 +1,12 @@
-# dancinglinks
-## Knuth's Dancing Links algorithm in Java
+# Knuth7: Dancing Links and SAT solvers in Java
 
-Implementation of ideas found in [Knuth's Fascicle 5C](https://www.cs.stanford.edu/~knuth/fasc5c.ps.gz) of [TAoCP](https://en.wikipedia.org/wiki/The_Art_of_Computer_Programming).
+Implementation of algorithms found in Knuth's fascicles 
+[5C](https://www.cs.stanford.edu/~knuth/fasc5c.ps.gz) and
+[6](https://www.amazon.com/Art-Computer-Programming-Fascicle-Satisfiability/dp/0134397606),
+which will both become part of chapter 7 of 
+[The Art of Computer Programming](https://en.wikipedia.org/wiki/The_Art_of_Computer_Programming).
+
+## Exact Cover
 
 The text describes variants of the Dancing Links algorithm, which can be used to solve the
 Exact Cover (XC) problem. One has a set of *items*, together with a set of *options* (which are 
@@ -30,7 +35,7 @@ fact this is the only solution.
 
 In code, we can say:
 
-```java
+``` java
 ExactCoverProblem p = ExactCoverProblem.parseFrom("a b c d e f g\nc e\na d g\nb c f\na d f\nb g\nd e g");
 ```
 
@@ -47,9 +52,9 @@ Adapters are provided for a few applications of XC that Knuth proposes.
 ### Sudoku
 
 You can supply a Sudoku problem in the form of a string of 81 digits or dots (indicating an empty
-cell), and then geneate a stream of solutions:
+cell), and then generate a stream of solutions:
 
-```java
+``` java
 String ex28c = ".3. .1. ... " +
                 "... 4.. 1.." +
                 ".5. ... .9." +
@@ -68,11 +73,11 @@ The solver is fast; it can generate an answer without about 15sm.
 
 ### Word Find
 
-You can request the generation of word find puzzles. Just supply the grid witdh and height and 
+You can request the generation of word find puzzles. Just supply the grid width and height and 
 a list of words to fit in the grid. Words can appear in any of the 8 orientations. The wrapper
 generates a stream of solutions as strings (using newlines to separate rows of the grid).
 
-```java
+``` java
 new WordFind(8, 8, Arrays.asList("gandalf", 
                                  "frodo", 
                                  "boromir", 
@@ -108,6 +113,11 @@ divide the primary from the secondary items (there should be whitespace on eithe
 semicolon), like: `a b c ; x y`.
 
 An item within an option my be given a color using a colon suffix, like `b c x:Red`. The XCC 
-algorithem implemented here will ensure that all options chosen for a solution will agree on 
+algorithm implemented here will ensure that all options chosen for a solution will agree on 
 the "color" the secondary items included.
 
+## Satisfiability
+
+Currently we implement algorithms A, B and D, which are enough for small problems. We implement
+[DIMACS format](http://people.sc.fsu.edu/~jburkardt/data/cnf/cnf.html)
+for SAT problem input. More to follow.

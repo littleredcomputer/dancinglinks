@@ -3,7 +3,6 @@ package net.littleredcomputer.knuth7;
 
 import com.google.common.base.Splitter;
 import com.google.common.base.Stopwatch;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -27,7 +26,6 @@ import java.util.stream.StreamSupport;
  * of TAOCP volume 4.
  */
 public class ExactCoverProblem {
-    private static final Splitter splitter = Splitter.on(' ').omitEmptyStrings();
     private static final Splitter colonSplitter = Splitter.on(':').omitEmptyStrings();
     private static final Logger log = LogManager.getFormatterLogger(ExactCoverProblem.class);
     private Duration logInterval = Duration.ofMillis(5000);
