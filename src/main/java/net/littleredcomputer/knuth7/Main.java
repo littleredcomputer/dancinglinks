@@ -14,6 +14,7 @@ import java.io.*;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -38,6 +39,17 @@ public class Main {
         return new BufferedReader(p.equals("-") ? new InputStreamReader(System.in) : new FileReader(p));
     }
 
+    private static Function<SATProblem, AbstractSATSolver> solver(CommandLine cmd) {
+        if (!cmd.hasOption("algorithm")) return SATAlgorithmA::new;
+        String a = cmd.getOptionValue("algorithm");
+        switch (a) {
+            case "A": return SATAlgorithmA::new;
+            case "B": return SATAlgorithmB::new;
+            case "D": return SATAlgorithmD::new;
+            default: throw new IllegalArgumentException("Unknown algorithm: " + a);
+        }
+    }
+
     private static Stream<Pair<Integer, Integer>> boxSizeStream() {
         return Stream.generate(new Supplier<Pair<Integer, Integer>>() {
             int width = 2;
@@ -55,6 +67,10 @@ public class Main {
                 return p;
             }
         });
+    }
+
+    private static Duration logInterval(CommandLine cmd) {
+        return Duration.parse(cmd.getOptionValue("loginterval", "PT0.1S"));
     }
 
     public static void main(String[] args) throws ParseException, FileNotFoundException {
@@ -103,7 +119,7 @@ public class Main {
                     }
                 } else {
                     new WordFind(w, h, words)
-                            .setLogInterval(Duration.parse(cmd.getOptionValue("loginterval", "PT0.1S")))
+                            .setLogInterval(logInterval(cmd))
                             .solutions()
                             .forEach(System.out::println);
                 }
@@ -111,7 +127,9 @@ public class Main {
             case "sat": {
                 SATProblem p = SATProblem.parseFrom(problem(cmd));
                 Stopwatch sw = Stopwatch.createStarted();
-                Optional<boolean[]> outcome = p.algorithmA();
+                AbstractSATSolver s = solver(cmd).apply(p);
+                s.setLogInterval(logInterval(cmd));
+                Optional<boolean[]> outcome = s.solve();
                 sw.stop();
                 System.out.println("c " + sw);
                 if (outcome.isPresent()) {

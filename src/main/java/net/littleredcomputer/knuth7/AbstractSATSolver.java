@@ -52,7 +52,7 @@ public abstract class AbstractSATSolver {
     void maybeReportProgress(int steps, int[] m) {
         Instant now = Instant.now();
         if (Duration.between(lastLogTime, now).compareTo(logInterval) < 0) return;
-        log.info(() -> new FormattedMessage("%s: %s %d steps. state %s", name, stopwatch, steps, stateToString(m)));
+        log.info(() -> new FormattedMessage("%s %d steps %s %s", name, steps, stopwatch, stateToString(m)));
         lastLogTime = now;
     }
     public abstract Optional<boolean[]> solve();

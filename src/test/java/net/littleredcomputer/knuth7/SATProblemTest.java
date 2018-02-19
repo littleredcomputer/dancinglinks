@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,9 +49,9 @@ public class SATProblemTest {
     private static String ex7 = "p cnf 4 7\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0";
     private static String ex6 = "p cnf 4 8\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0 -4 1 -2 0";
     private static List<Function<SATProblem, Optional<boolean[]>>> algorithms = ImmutableList.of(
-            SATProblem::algorithmA,
-            SATProblem::algorithmB,
-            SATProblem::algorithmD
+            p -> new SATAlgorithmA(p).solve(),
+            p -> new SATAlgorithmB(p).solve(),
+            p -> new SATAlgorithmD(p).solve()
     );
 
     @Test
@@ -87,6 +88,7 @@ public class SATProblemTest {
         algorithms.forEach(a -> assertThat(a.apply(p), isEmpty()));
     }
 
+    @Test
     public void quinn() {
         SATProblem p = fromResource("quinn.cnf");
         algorithms.forEach(a -> assertThat(a.apply(p).map(p::evaluate), isPresentAndIs(true)));
@@ -100,7 +102,7 @@ public class SATProblemTest {
      * @param n Length of binary string
      * @return the problem posed in dimacs CNF format
      */
-    private String waerdenProblem(int j, int k, int n) {
+    private SATProblem waerdenProblem(int j, int k, int n) {
         StringBuilder clauses = new StringBuilder();
         int clauseCount = 0;
         // Variables [1,n].
@@ -129,45 +131,45 @@ public class SATProblemTest {
                 ++clauseCount;
             }
         }
-        return "c waerden(" + j + ", " + k + ", " + n + ")\np cnf " + n + ' ' + clauseCount + '\n' + clauses;
+        return SATProblem.parseFrom(new StringReader("c waerden(" + j + ", " + k + ", " + n + ")\np cnf " + n + ' ' + clauseCount + '\n' + clauses));
     }
 
-    private int waerden(int j, int k, Function<SATProblem, Optional<boolean[]>> solver) {
+    private int waerden(int j, int k, Function<SATProblem, AbstractSATSolver> solver) {
         // waerdenProblem(j, k, n) is satisfiable iff n < W(j, k). Compute W by finding the smallest
         // integer for which the associated problem is unsatisfiable.
         return IntStream.range(1, 1000)
-                .filter(i -> !solver.apply(SATProblem.parseFrom(new StringReader(waerdenProblem(j, k, i)))).isPresent())
+                .filter(i -> !solver.apply(waerdenProblem(j, k, i)).solve().isPresent())
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("did not establish Waerden value"));
     }
 
     // Following are a collection of values from the table of W(j, k) given on p. 5 of Fascicle 6
-    @Test public void w3_3A() { assertThat(waerden(3, 3, SATProblem::algorithmA), is(9)); }
-    @Test public void w3_4A() { assertThat(waerden(3, 4, SATProblem::algorithmA), is(18)); }
-    @Test public void w4_3A() { assertThat(waerden(4, 3, SATProblem::algorithmA), is(18)); }
-    @Test public void w4_4A() { assertThat(waerden(4, 4, SATProblem::algorithmA), is(35)); }
-    @Test public void w3_6A() { assertThat(waerden(3, 6, SATProblem::algorithmA), is(32)); }
-    @Test public void w4_5A() { assertThat(waerden(4, 5, SATProblem::algorithmA), is(55)); }
-    @Test public void w5_4A() { assertThat(waerden(5, 4, SATProblem::algorithmA), is(55)); }
-    @Test public void w6_3A() { assertThat(waerden(6, 3, SATProblem::algorithmA), is(32)); }
+    @Test public void w3_3A() { assertThat(waerden(3, 3, SATAlgorithmA::new), is(9)); }
+    @Test public void w3_4A() { assertThat(waerden(3, 4, SATAlgorithmA::new), is(18)); }
+    @Test public void w4_3A() { assertThat(waerden(4, 3, SATAlgorithmA::new), is(18)); }
+    @Test public void w4_4A() { assertThat(waerden(4, 4, SATAlgorithmA::new), is(35)); }
+    @Test public void w3_6A() { assertThat(waerden(3, 6, SATAlgorithmA::new), is(32)); }
+    @Test public void w4_5A() { assertThat(waerden(4, 5, SATAlgorithmA::new), is(55)); }
+    @Test public void w5_4A() { assertThat(waerden(5, 4, SATAlgorithmA::new), is(55)); }
+    @Test public void w6_3A() { assertThat(waerden(6, 3, SATAlgorithmA::new), is(32)); }
 
-    @Test public void w3_3B() { assertThat(waerden(3, 3, SATProblem::algorithmB), is(9)); }
-    @Test public void w3_4B() { assertThat(waerden(3, 4, SATProblem::algorithmB), is(18)); }
-    @Test public void w4_3B() { assertThat(waerden(4, 3, SATProblem::algorithmB), is(18)); }
-    @Test public void w4_4B() { assertThat(waerden(4, 4, SATProblem::algorithmB), is(35)); }
-    @Test public void w3_6B() { assertThat(waerden(3, 6, SATProblem::algorithmB), is(32)); }
-    @Test public void w4_5B() { assertThat(waerden(4, 5, SATProblem::algorithmB), is(55)); }
-    @Test public void w5_4B() { assertThat(waerden(5, 4, SATProblem::algorithmB), is(55)); }
-    @Test public void w6_3B() { assertThat(waerden(6, 3, SATProblem::algorithmB), is(32)); }
+    @Test public void w3_3B() { assertThat(waerden(3, 3, SATAlgorithmB::new), is(9)); }
+    @Test public void w3_4B() { assertThat(waerden(3, 4, SATAlgorithmB::new), is(18)); }
+    @Test public void w4_3B() { assertThat(waerden(4, 3, SATAlgorithmB::new), is(18)); }
+    @Test public void w4_4B() { assertThat(waerden(4, 4, SATAlgorithmB::new), is(35)); }
+    @Test public void w3_6B() { assertThat(waerden(3, 6, SATAlgorithmB::new), is(32)); }
+    @Test public void w4_5B() { assertThat(waerden(4, 5, SATAlgorithmB::new), is(55)); }
+    @Test public void w5_4B() { assertThat(waerden(5, 4, SATAlgorithmB::new), is(55)); }
+    @Test public void w6_3B() { assertThat(waerden(6, 3, SATAlgorithmB::new), is(32)); }
 
-    @Test public void w3_3D() { assertThat(waerden(3, 3, SATProblem::algorithmD), is(9)); }
-    @Test public void w3_4D() { assertThat(waerden(3, 4, SATProblem::algorithmD), is(18)); }
-    @Test public void w4_3D() { assertThat(waerden(4, 3, SATProblem::algorithmD), is(18)); }
-    @Test public void w4_4D() { assertThat(waerden(4, 4, SATProblem::algorithmD), is(35)); }
-    @Test public void w3_6D() { assertThat(waerden(3, 6, SATProblem::algorithmD), is(32)); }
-    @Test public void w4_5D() { assertThat(waerden(4, 5, SATProblem::algorithmD), is(55)); }
-    @Test public void w5_4D() { assertThat(waerden(5, 4, SATProblem::algorithmD), is(55)); }
-    @Test public void w6_3D() { assertThat(waerden(6, 3, SATProblem::algorithmD), is(32)); }
+    @Test public void w3_3D() { assertThat(waerden(3, 3, SATAlgorithmD::new), is(9)); }
+    @Test public void w3_4D() { assertThat(waerden(3, 4, SATAlgorithmD::new), is(18)); }
+    @Test public void w4_3D() { assertThat(waerden(4, 3, SATAlgorithmD::new), is(18)); }
+    @Test public void w4_4D() { assertThat(waerden(4, 4, SATAlgorithmD::new), is(35)); }
+    @Test public void w3_6D() { assertThat(waerden(3, 6, SATAlgorithmD::new), is(32)); }
+    @Test public void w4_5D() { assertThat(waerden(4, 5, SATAlgorithmD::new), is(55)); }
+    @Test public void w5_4D() { assertThat(waerden(5, 4, SATAlgorithmD::new), is(55)); }
+    @Test public void w6_3D() { assertThat(waerden(6, 3, SATAlgorithmD::new), is(32)); }
 
     /**
      * Write the clauses corresponding to S1(y_i...) where the y_i correspond
@@ -197,7 +199,7 @@ public class SATProblemTest {
         return n;
     }
 
-    private String langfordProblem(int n) {
+    private SATProblem langfordProblem(int n) {
         // We arrange the problem using "vertical" arrays, one for each column of the
         // exact cover problem visualized as a matrix of rows of options. The first n
         // columns (or items) represent the digits; the next 2n columns represent the
@@ -217,7 +219,7 @@ public class SATProblemTest {
         int nClauses = 0;
         StringBuilder sb = new StringBuilder();
         for (List<Boolean> c : columns) nClauses += S1(c, sb);
-        return "c langford(" + n + ")\np cnf " + row + ' ' + nClauses + "\n" + sb;
+        return SATProblem.parseFrom(new StringReader("c langford(" + n + ")\np cnf " + row + ' ' + nClauses + "\n" + sb));
     }
 
     @Test
@@ -233,7 +235,7 @@ public class SATProblemTest {
         // (dual) placement). When i mod 4 in {1, 2}, the solver should refute the problem instance.
         List<Optional<Integer>> expected = range.get().mapToObj(i -> i % 4 == 0 || i % 4 == 3 ? Optional.of(i) : Optional.<Integer>empty()).collect(Collectors.toList());
         algorithms.forEach(a -> {
-            Stream<Optional<Integer>> observed = range.get().mapToObj(i -> a.apply(SATProblem.parseFrom(new StringReader(langfordProblem(i)))).map(countTrueBits));
+            Stream<Optional<Integer>> observed = range.get().mapToObj(i -> a.apply(langfordProblem(i)).map(countTrueBits));
             assertThat(observed.collect(Collectors.toList()), is(expected));
         });
     }
@@ -241,19 +243,19 @@ public class SATProblemTest {
     // These are redundant but it's useful to have a few small tests lying around for debugging
     @Test
     public void langford3() {
-        SATProblem p = SATProblem.parseFrom(new StringReader(langfordProblem(3)));
+        SATProblem p = langfordProblem(3);
         algorithms.forEach(a -> assertThat(a.apply(p).map(this::toBinaryString), isPresentAndIs("001010001")));
     }
 
     @Test
     public void langford4() {
-        SATProblem p = SATProblem.parseFrom(new StringReader(langfordProblem(4)));
+        SATProblem p = langfordProblem(4);
         algorithms.forEach(a -> assertThat(a.apply(p).map(this::toBinaryString), isPresentAndIs("000010100000100001")));
     }
 
     @Test
     public void unsatEvalsToFalse() {
-        SATProblem l9 = SATProblem.parseFrom(new StringReader(langfordProblem(9)));
+        SATProblem l9 = langfordProblem(9);
         algorithms.forEach(a -> assertThat(a.apply(l9), isEmpty()));
         final int N = l9.nVariables();
         boolean[] v = new boolean[N];
@@ -264,6 +266,13 @@ public class SATProblemTest {
             }
             assertThat(l9.evaluate(v), is(false));
         }
+    }
+
+    @Test
+    public void zzz() {
+        SATProblem p = waerdenProblem(3, 3, 9);
+        SATAlgorithmL a = new SATAlgorithmL(p);
+        a.solve();
     }
 
     //Too hard for algorithm A or B, at least as a unit test

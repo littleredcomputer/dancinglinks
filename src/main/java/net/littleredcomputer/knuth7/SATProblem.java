@@ -71,18 +71,6 @@ public class SATProblem {
         return true;  // No clause was falsified by any literal.
     }
 
-    public Optional<boolean[]> algorithmA() {
-        return new SATAlgorithmA(this).solve();
-    }
-
-    public Optional<boolean[]> algorithmB() {
-        return new SATAlgorithmB(this).solve();
-    }
-
-    public Optional<boolean[]> algorithmD() {
-        return new SATAlgorithmD(this).solve();
-    }
-
     public static SATProblem parseFrom(Reader r) {
         BufferedReader br = new BufferedReader(r);
         int nVar;
