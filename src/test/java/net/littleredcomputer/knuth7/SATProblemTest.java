@@ -270,9 +270,11 @@ public class SATProblemTest {
 
     @Test
     public void zzz() {
-        SATProblem p = waerdenProblem(3, 3, 9);
-        SATAlgorithmL a = new SATAlgorithmL(p);
-        a.solve();
+        new SATAlgorithmL(waerdenProblem(3, 3, 9)).solve();
+//        new SATAlgorithmL(waerdenProblem(3, 3, 8)).solve();
+//        new SATAlgorithmL(langfordProblem(3)).solve();
+//        SATProblem q = langfordProblem(3);
+//        new SATAlgorithmL(q).solve();
     }
 
     //Too hard for algorithm A or B, at least as a unit test

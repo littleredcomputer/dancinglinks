@@ -17,6 +17,7 @@ public class SATProblem {
     private final int nVariables; // XXX do we care?
     private final List<List<Integer>> clauses = new ArrayList<>();
     private int nLiterals = 0;
+    private int width = 0;
 
     private SATProblem(int nVariables) {
         if (nVariables < 1) throw new IllegalArgumentException("Must have at least one variable");
@@ -26,6 +27,7 @@ public class SATProblem {
     public int nClauses() { return clauses.size(); }
     public int nVariables() { return nVariables; }
     public int nLiterals() { return nLiterals; }
+    public int width() { return width; }
     public List<Integer> getClause(int i) { return clauses.get(i); }
 
     private static StreamTokenizer tokenizer(Reader r) {
@@ -50,6 +52,7 @@ public class SATProblem {
         List<Integer> ls = literals.stream().map(SATProblem::encodeLiteral).collect(ImmutableList.toImmutableList());
         clauses.add(ls);
         nLiterals += ls.size();
+        if (ls.size() > width) width = ls.size();
     }
 
     Optional<boolean[]> solutionFromSteps(int[] steps) {
