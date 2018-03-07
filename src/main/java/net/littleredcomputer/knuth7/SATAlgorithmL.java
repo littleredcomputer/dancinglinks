@@ -10,8 +10,8 @@ import java.util.function.IntPredicate;
 
 public class SATAlgorithmL extends AbstractSATSolver {
     private static final Logger log = LogManager.getFormatterLogger();
-    private static int NT = 0x7ffffffe;
-    private static int RT = NT - 2;
+    private static int RT = 0x7ffffffe;
+    private static int NT = RT - 2;
     private static int PT = RT - 2;
 
     // These next 4 arrays all grow in sync.
@@ -35,6 +35,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private final Stack<Pair<Integer, Integer>> ISTACK = new Stack<>();
     private int T = NT;  // truth degree (F6 7.2.2.2 p. 37)
     private int E = 0;  // literals R[k] are "nearly true" for G <= k < E.
+    private int F = 0;
+    private int G = 0;
     private int ISTAMP = 0;
 
     private enum Fixity {
@@ -69,13 +71,18 @@ public class SATAlgorithmL extends AbstractSATSolver {
      * returned.
      */
     private boolean propagate(int l) {
-        System.out.printf("propagate %d\n", l);
+        System.out.printf("propagate %d\n", SATProblem.decodeLiteral(l));
         int H = E;
-        takeAccountOf(l);
-        while (H < E) {
-            l = R[H];
-            ++H;
-            if (!bimpForEach(l, this::takeAccountOf)) return false;
+        if (!takeAccountOf(l)) {
+            System.out.println("immediate conflict");
+            return false;
+        }
+        for (; H < E; ++H) {
+            System.out.printf("extra propagation for %d\n", SATProblem.decodeLiteral(R[H]));
+            if (!bimpForEach(R[H], this::takeAccountOf)) {
+                System.out.printf("conflict at R[H]=%d\n", SATProblem.decodeLiteral(R[H]));
+                return false;
+            }
         }
         return true;
     }
@@ -93,9 +100,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
     /* True if BIMP[b] contains l. */
     private boolean bimpContains(int b, int l) {
-        List<Integer> bimpb = BIMP.get(b);
-        for (int i = 0; i < BSIZE[b]; ++i) if (bimpb.get(i) == l) return true;
-        return false;
+        return BIMP.get(b).contains(l);
     }
 
     /* Append l to BIMP[b], allowing for an undo in the future. */
@@ -110,27 +115,44 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
     // TODO: from the bottom up, implement an escape discipline for the CONFLICT cases in the subroutines.
 
-
+    private static int dl(int literal) { return SATProblem.decodeLiteral(literal); }
     /**
      * Implements steps L8 and L9 of Algorithm L. Returns false if the next step is CONFLICT.
      */
     private boolean consider(int u, int v) {
+        System.out.printf("consider %d∨%d\n", dl(u), dl(v));
         // STEP L8: Consider u ∨ v
         Fixity fu = fixity(u);
         Fixity fv = fixity(v);
 
         if (fu == Fixity.FIXED_T || fv == Fixity.FIXED_T) return true;
-        else if (fu == Fixity.FIXED_F && fv == Fixity.FIXED_F) return false;
+        else if (fu == Fixity.FIXED_F && fv == Fixity.FIXED_F) {
+            System.out.println("...both fixed false: conflict");
+            return false;
+        }
         else if (fu == Fixity.FIXED_F && fv == Fixity.UNFIXED) {
+            System.out.printf("... %d was fixed false, so propagating unfixed %d\n", dl(u), dl(v));
             return propagate(v);
         } else if (fv == Fixity.FIXED_F && fu == Fixity.UNFIXED) {
+            System.out.printf("... %d was fixed false, so propagating unfixed %d\n", dl(v), dl(u));
             return propagate(u);
         }
+        System.out.printf("Exploiting %d∨%d\n", dl(u), dl(v));
         // STEP L9: Exploit u || v.
-        if (bimpContains(u ^ 1, v ^ 1)) return propagate(u);
-        else if (bimpContains(u ^ 1, v)) return true;
-        else if (bimpContains(v ^ 1, u ^ 1)) return propagate(v);
+        if (bimpContains(u ^ 1, v ^ 1)) {
+            System.out.printf("...BIMP[%d] contains %d, so propagating %d\n", dl(u^1), dl(v^1), dl(u));
+            return propagate(u);
+        }
+        else if (bimpContains(u ^ 1, v)) {
+            System.out.printf("...BIMP[%d] contains %d, so doing nothing\n", dl(u^1), dl(v));
+            return true;
+        }
+        else if (bimpContains(v ^ 1, u ^ 1)) {
+            System.out.printf("...BIMP[%d] contains %d, so propagating %d\n", dl(v^1), dl(u^1), dl(v));
+            return propagate(v);
+        }
         // Append v to BIMP(¬u), u to BIMP(¬v).
+        System.out.printf("...Appending %d to BIMP[%d], %d to BIMP[%d]\n", dl(v), dl(u^1), dl(u), dl(v^1));
         appendToBimp(u ^ 1, v);
         appendToBimp(v ^ 1, u);
         return true;
@@ -153,11 +175,49 @@ public class SATAlgorithmL extends AbstractSATSolver {
             case FIXED_F:
                 return /* conflict */ false;
             case UNFIXED:
+                System.out.printf("takeAccountOf asserting %d\n", dl(l));
                 VAL[l >> 1] = T + (l & 1);
                 R[E] = l;
                 ++E;
         }
         return true;
+    }
+
+    private String timpToString(int l) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("  %3d: ", dl(l)));
+        for (int i = 0, p = TIMP.get(l); i < TSIZE[l]; i++, p = NEXT.get(p)) {
+            sb.append(dl(U.get(p))).append(':').append(dl(V.get(p))).append(' ');
+        }
+//        sb.append("          ");
+//        for (int i = 0, p = TIMP.get(l); i < TSIZE[l]; i++, p = NEXT.get(p)) {
+//            sb.append('[').append(dl(U.get(LINK.get(p)))).append(':').append(dl(V.get(LINK.get(p)))).append('@').append(LINK.get(p)).append(' ');
+//            sb.append(dl(U.get(LINK.get(LINK.get(p))))).append(':').append(dl(V.get(LINK.get(LINK.get(p))))).append('@').append(LINK.get(LINK.get(p))).append(' ');
+//            sb.append(dl(U.get(LINK.get(LINK.get(LINK.get(p)))))).append(':').append(dl(V.get(LINK.get(LINK.get(LINK.get(p)))))).append('@').append(LINK.get(LINK.get(LINK.get(p)))).append("] ");
+//        }
+        return sb.toString();
+    }
+
+    private void print() {
+        final int nVariables = problem.nVariables();
+        System.out.printf("BIMP tables:\n");
+        for (int l = 2; l <= 2*nVariables+1; ++l) {
+            if (BSIZE[l] < 0) throw new IllegalStateException(String.format("bad BIMP at %d (%d): %d", l, dl(l), BSIZE[l]));
+            if (BSIZE[l] > 0) {
+                List<Integer> b = BIMP.get(l);
+                System.out.printf("  %3d: ", dl(l));
+                for (int i = 0; i < BSIZE[l]; ++i) System.out.printf("%d ", dl(b.get(i)));
+                System.out.println();
+            }
+        }
+        System.out.println("TIMP tables:\n");
+        for (int l = 2; l <= 2*nVariables+1; ++l) {
+            if (TSIZE[l] > 0) {
+                System.out.println(timpToString(l));
+            }
+        }
+        System.out.printf("E=%d F=%d G=%d VAR %s VAL %s\n", E, F, G, Arrays.toString(VAR), Arrays.toString(VAL));
+//        System.out.println("INX " + Arrays.toString(INX));
     }
 
     @Override
@@ -230,29 +290,36 @@ public class SATAlgorithmL extends AbstractSATSolver {
             INX[k + 1] = k;
         }
         int d = 0;
-        int F = 0;
         int CONFLICT = 0;
-        int G = 0;
 
-        System.out.println("BIMP " + BIMP);
-        System.out.println("TIMP " + TIMP);
-        System.out.println("U " + U);
-        System.out.println("V " + V);
-        System.out.println("LINK " + LINK);
-        System.out.println("NEXT " + NEXT);
-        System.out.println("VAR " + Arrays.toString(VAR));
-        System.out.println("INX " + Arrays.toString(INX));
+        print();
 
         int state = 2;
         int l = 0;
         int L = 0;
         int stepCount = 0;
 
+        System.out.printf("    U: %s\n", U);
+        System.out.printf("    V: %s\n", V);
+        System.out.printf(" NEXT: %s\n", NEXT);
+        System.out.printf(" LINK: %s\n", LINK);
+        System.out.printf(" TIMP: %s\n", TIMP);
+        System.out.printf("TSIZE: %s\n", Arrays.toString(TSIZE));
+
+        System.out.println("clauses:");
+        for (int i = 0; i < problem.nClauses(); ++i) {
+            List<Integer> c = problem.getClause(i);
+            for (int l0 : c) System.out.printf("%d ", dl(l0));
+            System.out.print("   ");
+        }
+        System.out.println();
+
         STEP:
         while (true) {
             ++stepCount;
-            System.out.printf("step %d in state %d F=%d\n", stepCount, state, F);
+            System.out.printf(">>>> state %d   (this is step %d)\n", state, stepCount);
             if (stepCount > 100) throw new IllegalStateException("done");
+            // print();
             switch (state) {
                 case 0:
                 case 1:
@@ -265,7 +332,10 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     }
                     // Step X1:  Satisfied?
                     if (F == nVariables) {
-                        return Optional.of(new boolean[]{true});
+                        System.out.printf("returning because SAT\n");
+                        boolean sat[] = new boolean[nVariables];
+                        for (int i = 1; i <= nVariables; ++i) sat[i-1] = (VAL[i] & 1) == 0;
+                        return Optional.of(sat);
                     }
                     // Go to state 15 if alg. X has discovered a conflict.
                     if (FORCE.size() == 0) {
@@ -292,7 +362,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     BRANCH[d] = 0;
                 }
                 case 4:  // Try l.
-                    System.out.printf("d=%d. Trying %d\n", d, l);
+                    System.out.printf("d=%d. Trying %d\n", d, dl(l));
                     // u = 1;            // FIXME: is u just the size of the FORCE array? Can we eliminate that variable?
                     // FORCE.add(l);
                     // Not quite! we can get here from step 14 which can be a consequence of CONFLICT in step 5 via step 11. So,
@@ -301,6 +371,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     FORCE.add(l);
                     // FORCE.set(0, l);  // FIXME: Can this step be folded into step 3, and the scope of l thereby reduced?
                 case 5:  // Accept near truths.
+                    System.out.printf("Accepting near-truths\n");
                     T = NT;
                     G = E = F;
                     ++ISTAMP;
@@ -315,13 +386,16 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     FORCE.clear();
 
                 case 6:  // Choose a nearly true l.
+                    System.out.printf("Choose a nearly true l. G=%d, E=%d\n", G, E);
                     if (G == E) {
                         state = 10;
                         continue;
                     }
                     L = R[G];
                     ++G;
+                    System.out.printf("Chose %d. Now G=%d\n", dl(L), G);
                 case 7: {  // Promote L to real truth.
+                    System.out.printf("** Promote %d to real truth\n", dl(L));
                     int X = L >> 1;
                     VAL[X] = RT + (L & 1);
                     // Remove variable X from the free list and from all TIMP pairs (ex. 137).
@@ -333,16 +407,31 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     VAR[N] = X;
                     INX[X] = N;
                     for (int l0 = 2 * X; l0 <= 2 * X + 1; ++l0) {
-                        for (int p = TIMP.get(l0), tcount = 0; p != 0 && tcount < TSIZE[l0]; p = NEXT.get(p), ++tcount) {
+                        // System.out.printf("purging %d\n", dl(l0));
+                        for (int p = TIMP.get(l0), tcount = 0; tcount < TSIZE[l0]; p = NEXT.get(p), ++tcount) {
                             int u0 = U.get(p);
                             int v = V.get(p);
                             int pp = LINK.get(p);
                             int ppp = LINK.get(pp);
+                            // System.out.printf("looking at pair %d:%d\n", dl(u0), dl(v));
+                            // System.out.printf("  associated pair #1: %d:%d\n", dl(U.get(pp)), dl(V.get(pp)));
+                            // System.out.printf("  associated pair #2: %d:%d\n", dl(U.get(ppp)), dl(V.get(ppp)));
+                            // System.out.printf("The cycle is %d-%d-%d-%d\n", p, pp, ppp, LINK.get(ppp));
+                            // System.out.printf("BEFORE is %s\n", timpToString(u0^1));
                             int s = TSIZE[u0 ^ 1] - 1;
                             TSIZE[u0 ^ 1] = s;
                             int t = TIMP.get(u0 ^ 1);
-                            for (int i = 0; i < s; ++i) t = NEXT.get(t);
+                            for (int i = 0; i < s; ++i) t = NEXT.get(t); // XXX i = 1 or 0 here?
+
+
+                            // System.out.printf("pair s=%d of TIMP(%d) is %d:%d @%d\n", s, dl(u0^1), dl(U.get(t)), dl(V.get(t)), t);
+                            // System.out.printf("The first t-cycle is %d-%d-%d-%d\n", t, LINK.get(t), LINK.get(LINK.get(t)), LINK.get(LINK.get(LINK.get(t))));
                             if (pp != t) {
+//                                System.out.printf("swapping pairs A %d:%d @%d <-> %d:%d @%d\n", dl(U.get(t)),
+//                                        dl(V.get(t)), t,
+//                                        dl(U.get(pp)),
+//                                        dl(V.get(pp)),
+//                                        pp);
                                 int uu = U.get(t);
                                 int vv = V.get(t);
                                 int q = LINK.get(t);
@@ -353,15 +442,29 @@ public class SATAlgorithmL extends AbstractSATSolver {
                                 V.set(pp, vv);
                                 LINK.set(pp, q);
                                 U.set(t, v);
-                                V.set(t, l ^ 1);
+                                V.set(t, l0 ^ 1);
                                 LINK.set(t, ppp);
                             }
+                            // System.out.printf("AFTER  is %s\n", timpToString(u0^1));
+                            // System.out.printf("BEFORE is %s\n", timpToString(v^1));
                             // Then set...
                             s = TSIZE[v ^ 1] - 1;
                             TSIZE[v ^ 1] = s;
                             t = TIMP.get(v ^ 1);
-                            for (int i = 0; i < s; ++i) t = NEXT.get(t);
+                            for (int i = 0; i < s; ++i) t = NEXT.get(t);  // XXX i = 1 or 0?
+                            // System.out.printf("pair s=%d of TIMP(%d) is %d:%d @%d\n", s, dl(v^1), dl(U.get(t)), dl(V.get(t)), t);
+                            // System.out.printf("The second t-cycle is %d-%d-%d-%d\n", t, LINK.get(t), LINK.get(LINK.get(t)), LINK.get(LINK.get(LINK.get(t))));
+                            // NOT IN KNUTH: reset pp, ppp.
+                            pp = LINK.get(p);
+                            ppp = LINK.get(pp);
+                            // END NOT IN KNUTH
+
                             if (ppp != t) {  // swap pairs by setting
+//                                System.out.printf("swapping pairs B %d:%d @%d <-> %d:%d @%d\n", dl(U.get(t)),
+//                                        dl(V.get(t)), t,
+//                                        dl(U.get(ppp)),
+//                                        dl(V.get(ppp)),
+//                                        ppp);
                                 int uu = U.get(t);
                                 int vv = V.get(t);
                                 int q = LINK.get(t);
@@ -371,16 +474,22 @@ public class SATAlgorithmL extends AbstractSATSolver {
                                 U.set(ppp, uu);
                                 V.set(ppp, vv);
                                 LINK.set(ppp, q);
-                                U.set(t, l ^ 1);
+                                U.set(t, l0 ^ 1);
                                 V.set(t, u0);
                                 LINK.set(t, p);
                             }
+                            // System.out.printf(" AFTER is %s\n", timpToString(v^1));
+                            // print();
                         }
+                        // System.out.printf("*** post treatment of %d\n", dl(l0));
+                        // print();
                     }
+                    System.out.printf("After setting var %d\n", X);
+                    print();
 
                     // Do step L8 for all pairs (u,v) in TIMP(L) then return to L6.
-                    for (int k = TIMP.get(L), tcount = 0; k != 0 && tcount < TSIZE[L]; k = NEXT.get(k), ++tcount) {
-                        boolean conflict = !consider(U.get(k), V.get(k));
+                    for (int p = TIMP.get(L), tcount = 0; tcount < TSIZE[L]; p = NEXT.get(p), ++tcount) {
+                        boolean conflict = !consider(U.get(p), V.get(p));
                         if (conflict) {
                             state = CONFLICT;
                             continue STEP;
@@ -403,7 +512,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 case 11:  // Unfix near truths.
                     while (E > G) {
                         --E;
-                        System.out.printf("d=%d. Retracting %d\n", d, R[E]);
+                        System.out.printf("d=%d. Retracting %d\n", d, dl(R[E]));
                         VAL[R[E] >> 1] = 0;
                     }
                 case 12:  // Unfix real truths.
@@ -418,12 +527,14 @@ public class SATAlgorithmL extends AbstractSATSolver {
                             // this working. Real solutions might involve having a PREV array
                             // to allow traversal in the opposite order of NEXT.
 
+                            System.out.printf("Reactivating %d\n",dl(l0));
                             Stack<Integer> stack = new Stack<>();
-                            for (int p = TIMP.get(l0), tcount = 0; p != 0 && tcount < TSIZE[l0]; p = NEXT.get(p), ++tcount) {
+
+
+                            for (int p = TIMP.get(l0), tcount = 0; tcount < TSIZE[l0]; p = NEXT.get(p), ++tcount) {
                                 stack.push(p);
                             }
-                            while (!stack.empty()) {
-                                int p = stack.pop();
+                            stack.forEach(p -> {
                                 int u0 = U.get(p);
                                 int v = V.get(p);
                                 ++TSIZE[v^1];
@@ -433,7 +544,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                                 // order (perhaps increasing TSIZE may reveal new entries in the
                                 // TLIST, highlighting the fact that we need to check that in the
                                 // iterations over TIMP.
-                            }
+                            });
                         }
                         VAL[X] = 0;
                     }
@@ -449,7 +560,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         l = DEC[d];
                         DEC[d] = l = (l ^ 1);
                         BRANCH[d] = 1;
-                        System.out.printf("d=%d. That didn't work, trying %d\n", d, l);
+                        System.out.printf("d=%d. That didn't work, trying %d\n", d, dl(l));
                         state = 4;
                         continue;
                     }

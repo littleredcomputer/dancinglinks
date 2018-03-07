@@ -17,7 +17,7 @@ public class SATProblem {
     private final int nVariables; // XXX do we care?
     private final List<List<Integer>> clauses = new ArrayList<>();
     private int nLiterals = 0;
-    private int width = 0;
+    private int height = 0;
 
     private SATProblem(int nVariables) {
         if (nVariables < 1) throw new IllegalArgumentException("Must have at least one variable");
@@ -27,7 +27,7 @@ public class SATProblem {
     public int nClauses() { return clauses.size(); }
     public int nVariables() { return nVariables; }
     public int nLiterals() { return nLiterals; }
-    public int width() { return width; }
+    public int height() { return height; }
     public List<Integer> getClause(int i) { return clauses.get(i); }
 
     private static StreamTokenizer tokenizer(Reader r) {
@@ -41,18 +41,22 @@ public class SATProblem {
     /**
      * Implement the encoding described in 7.2.2.2 (57)
      *
-     * @param literal A positive or negative variable number
+     * @param variable A positive or negative variable number
      * @return The [2n|2n+1]-encoded valude
      */
-    private static int encodeLiteral(int literal) {
-        return literal > 0 ? 2 * literal : -2 * literal + 1;
+    private static int encodeLiteral(int variable) {
+        return variable > 0 ? 2 * variable : -2 * variable + 1;
+    }
+    static int decodeLiteral(int literal) {
+        int sign = ((literal & 1) == 0) ? 1 : -1;
+        return sign * (literal >> 1);
     }
 
     private void addClause(List<Integer> literals) {
         List<Integer> ls = literals.stream().map(SATProblem::encodeLiteral).collect(ImmutableList.toImmutableList());
         clauses.add(ls);
         nLiterals += ls.size();
-        if (ls.size() > width) width = ls.size();
+        if (ls.size() > height) height = ls.size();
     }
 
     Optional<boolean[]> solutionFromSteps(int[] steps) {

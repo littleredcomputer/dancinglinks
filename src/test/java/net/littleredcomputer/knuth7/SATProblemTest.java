@@ -46,8 +46,8 @@ public class SATProblemTest {
         SATProblem.parseFrom(new StringReader("c unclosed clause\np cnf 3 2\n1 2 3 0\n2 3 -1 0\n-2 -3"));
     }
 
-    private static String ex7 = "p cnf 4 7\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0";
     private static String ex6 = "p cnf 4 8\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0 -4 1 -2 0";
+    private static String ex7 = "p cnf 4 7\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0";
     private static List<Function<SATProblem, Optional<boolean[]>>> algorithms = ImmutableList.of(
             p -> new SATAlgorithmA(p).solve(),
             p -> new SATAlgorithmB(p).solve(),
@@ -58,7 +58,7 @@ public class SATProblemTest {
     public void ex7() {
         SATProblem p = SATProblem.parseFrom(new StringReader(ex7));
         algorithms.forEach(a -> assertThat(a.apply(p), isPresentAndIs(new boolean[]{false, true, false, true})));
-        }
+    }
 
     @Test
     public void ex6() {
@@ -269,9 +269,17 @@ public class SATProblemTest {
     }
 
     @Test
-    public void zzz() {
-        new SATAlgorithmL(waerdenProblem(3, 3, 9)).solve();
-//        new SATAlgorithmL(waerdenProblem(3, 3, 8)).solve();
+    public void algorithmL() {
+        //assertThat(new SATAlgorithmL(SATProblem.parseFrom(new StringReader(ex7))).solve().map(this::toBinaryString), isPresentAndIs("0101"));
+        //assertThat(new SATAlgorithmL(SATProblem.parseFrom(new StringReader(ex6))).solve(), isEmpty());
+        SATProblem p = waerdenProblem(3,3,8);
+        //assertThat(new SATAlgorithmD(p).solve().map(this::toBinaryString), isPresentAndIs("00110011"));
+        assertThat(new SATAlgorithmL(p).solve().map(p::evaluate), isPresentAndIs(true));
+//        assertThat(new SATAlgorithmL(p).solve().map(p::evaluate),isPresentAndIs(true));
+//        assertThat(new SATAlgorithmD(p).solve().map(this::toBinaryString), isPresentAndIs("101011010"));
+//        assertThat(new SATAlgorithmL(p).solve().map(p::evaluate), isPresentAndIs(true));
+//        new SATAlgorithmL(waerdenProblem(3, 3, 9)).solve();
+//        new SATAlgorithmL(waerdenProblem(3, 3, 9)).solve();
 //        new SATAlgorithmL(langfordProblem(3)).solve();
 //        SATProblem q = langfordProblem(3);
 //        new SATAlgorithmL(q).solve();
