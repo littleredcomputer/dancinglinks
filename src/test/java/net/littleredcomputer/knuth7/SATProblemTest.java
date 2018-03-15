@@ -70,6 +70,9 @@ public class SATProblemTest {
         return SATProblem.parseFrom(new InputStreamReader(this.getClass().getClassLoader().getResourceAsStream(name)));
     }
 
+    private final SATProblem zebra = fromResource("zebra.cnf");
+    private final SATProblem quinn = fromResource("quinn.cnf");
+
     private String toBinaryString(boolean[] bs) {
         StringBuilder s = new StringBuilder();
         for (boolean b : bs) s.append(b ? '1' : '0');
@@ -78,8 +81,7 @@ public class SATProblemTest {
 
     @Test
     public void zebra() {
-        SATProblem p = fromResource("zebra.cnf");
-        algorithms.forEach(a -> assertThat(a.apply(p).map(p::evaluate), isPresentAndIs(true)));
+        algorithms.forEach(a -> assertThat(a.apply(zebra).map(zebra::evaluate), isPresentAndIs(true)));
     }
 
     @Test
@@ -90,8 +92,7 @@ public class SATProblemTest {
 
     @Test
     public void quinn() {
-        SATProblem p = fromResource("quinn.cnf");
-        algorithms.forEach(a -> assertThat(a.apply(p).map(p::evaluate), isPresentAndIs(true)));
+        algorithms.forEach(a -> assertThat(a.apply(quinn).map(quinn::evaluate), isPresentAndIs(true)));
     }
 
     /**
@@ -170,6 +171,8 @@ public class SATProblemTest {
     @Test public void w4_5D() { assertThat(waerden(4, 5, SATAlgorithmD::new), is(55)); }
     @Test public void w5_4D() { assertThat(waerden(5, 4, SATAlgorithmD::new), is(55)); }
     @Test public void w6_3D() { assertThat(waerden(6, 3, SATAlgorithmD::new), is(32)); }
+
+    @Test public void w3_3L() { assertThat(waerden(3, 3, SATAlgorithmL::new), is(9)); }
 
     /**
      * Write the clauses corresponding to S1(y_i...) where the y_i correspond
@@ -270,19 +273,9 @@ public class SATProblemTest {
 
     @Test
     public void algorithmL() {
-        //assertThat(new SATAlgorithmL(SATProblem.parseFrom(new StringReader(ex7))).solve().map(this::toBinaryString), isPresentAndIs("0101"));
-        //assertThat(new SATAlgorithmL(SATProblem.parseFrom(new StringReader(ex6))).solve(), isEmpty());
-        SATProblem p = waerdenProblem(3,3,8);
-        //assertThat(new SATAlgorithmD(p).solve().map(this::toBinaryString), isPresentAndIs("00110011"));
-        assertThat(new SATAlgorithmL(p).solve().map(p::evaluate), isPresentAndIs(true));
-//        assertThat(new SATAlgorithmL(p).solve().map(p::evaluate),isPresentAndIs(true));
-//        assertThat(new SATAlgorithmD(p).solve().map(this::toBinaryString), isPresentAndIs("101011010"));
-//        assertThat(new SATAlgorithmL(p).solve().map(p::evaluate), isPresentAndIs(true));
-//        new SATAlgorithmL(waerdenProblem(3, 3, 9)).solve();
-//        new SATAlgorithmL(waerdenProblem(3, 3, 9)).solve();
-//        new SATAlgorithmL(langfordProblem(3)).solve();
-//        SATProblem q = langfordProblem(3);
-//        new SATAlgorithmL(q).solve();
+        SATProblem w = waerdenProblem(3,3,8);
+        assertThat(new SATAlgorithmL(w).solve().map(w::evaluate), isPresentAndIs(true));
+        assertThat(new SATAlgorithmL(quinn).solve().map(quinn::evaluate), isPresentAndIs(true));
     }
 
     //Too hard for algorithm A or B, at least as a unit test

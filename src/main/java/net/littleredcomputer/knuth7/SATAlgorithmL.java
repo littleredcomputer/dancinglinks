@@ -100,7 +100,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
     /* True if BIMP[b] contains l. */
     private boolean bimpContains(int b, int l) {
-        return BIMP.get(b).contains(l);
+        return !bimpForEach(b, i -> i != l);
     }
 
     /* Append l to BIMP[b], allowing for an undo in the future. */
@@ -125,7 +125,10 @@ public class SATAlgorithmL extends AbstractSATSolver {
         Fixity fu = fixity(u);
         Fixity fv = fixity(v);
 
-        if (fu == Fixity.FIXED_T || fv == Fixity.FIXED_T) return true;
+        if (fu == Fixity.FIXED_T || fv == Fixity.FIXED_T) {
+            System.out.printf("... %s, %s: so doing nothing\n", fu.toString(), fv.toString());
+            return true;
+        }
         else if (fu == Fixity.FIXED_F && fv == Fixity.FIXED_F) {
             System.out.println("...both fixed false: conflict");
             return false;
@@ -292,8 +295,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         int d = 0;
         int CONFLICT = 0;
 
-        print();
-
         int state = 2;
         int l = 0;
         int L = 0;
@@ -317,15 +318,14 @@ public class SATAlgorithmL extends AbstractSATSolver {
         STEP:
         while (true) {
             ++stepCount;
-            System.out.printf(">>>> state %d   (this is step %d)\n", state, stepCount);
             if (stepCount > 100) throw new IllegalStateException("done");
-            // print();
+            print();
+            System.out.printf(">>>> state %d   (this is step %d)\n", state, stepCount);
             switch (state) {
                 case 0:
                 case 1:
                     throw new IllegalStateException("Internal error: illegal state " + state);
                 case 2:  // New node.
-                    BRANCH[d] = -1;
                     if (FORCE.size() > 0) {
                         state = 5;
                         continue;
@@ -333,7 +333,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     // Step X1:  Satisfied?
                     if (F == nVariables) {
                         System.out.printf("returning because SAT\n");
-                        boolean sat[] = new boolean[nVariables];
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    boolean sat[] = new boolean[nVariables];
                         for (int i = 1; i <= nVariables; ++i) sat[i-1] = (VAL[i] & 1) == 0;
                         return Optional.of(sat);
                     }
@@ -341,6 +341,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     if (FORCE.size() == 0) {
                         log.warn("Not running algorithm X");
                     }
+                    BRANCH[d] = -1;
                 case 3: {  // Choose l.
                     // If we had algorithm X, we could make a smart choice.
                     // Algorithm X can also reply "0".  For now, we're going
@@ -484,8 +485,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         // System.out.printf("*** post treatment of %d\n", dl(l0));
                         // print();
                     }
-                    System.out.printf("After setting var %d\n", X);
-                    print();
 
                     // Do step L8 for all pairs (u,v) in TIMP(L) then return to L6.
                     for (int p = TIMP.get(L), tcount = 0; tcount < TSIZE[L]; p = NEXT.get(p), ++tcount) {
