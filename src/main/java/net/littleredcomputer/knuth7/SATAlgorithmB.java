@@ -43,6 +43,8 @@ public class SATAlgorithmB extends AbstractSATSolver {
         int state = 2;
 
         STEP: while (true) {
+            ++stepCount;
+            if (stepCount % logCheckSteps == 0) maybeReportProgress(m);
             switch (state) {
                 case 2:  // Rejoice or choose.
                     if (d > nVariables) return problem.solutionFromSteps(m);

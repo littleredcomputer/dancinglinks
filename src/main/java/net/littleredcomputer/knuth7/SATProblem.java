@@ -2,10 +2,7 @@ package net.littleredcomputer.knuth7;
 
 import com.google.common.collect.ImmutableList;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.Reader;
-import java.io.StreamTokenizer;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -15,7 +12,7 @@ import java.util.regex.Pattern;
 public class SATProblem {
     private static Pattern pLineRe = Pattern.compile("p\\s+cnf\\s+([0-9]+)\\s+([0-9]+)\\s*");
     private final int nVariables; // XXX do we care?
-    private final List<List<Integer>> clauses = new ArrayList<>();
+    private final List<ImmutableList<Integer>> clauses = new ArrayList<>();
     private int nLiterals = 0;
     private int height = 0;
 
@@ -28,7 +25,7 @@ public class SATProblem {
     public int nVariables() { return nVariables; }
     public int nLiterals() { return nLiterals; }
     public int height() { return height; }
-    public List<Integer> getClause(int i) { return clauses.get(i); }
+    ImmutableList<Integer> getClause(int i) { return clauses.get(i); }
 
     private static StreamTokenizer tokenizer(Reader r) {
         StreamTokenizer t = new StreamTokenizer(r);
@@ -53,10 +50,16 @@ public class SATProblem {
     }
 
     private void addClause(List<Integer> literals) {
-        List<Integer> ls = literals.stream().map(SATProblem::encodeLiteral).collect(ImmutableList.toImmutableList());
+        ImmutableList<Integer> ls = literals.stream().map(SATProblem::encodeLiteral).collect(ImmutableList.toImmutableList());
         clauses.add(ls);
         nLiterals += ls.size();
         if (ls.size() > height) height = ls.size();
+    }
+
+    private void addEncodedClause(ImmutableList<Integer> encodedLiterals) {
+        clauses.add(encodedLiterals);
+        nLiterals += encodedLiterals.size();
+        if (encodedLiterals.size() > height) height = encodedLiterals.size();
     }
 
     Optional<boolean[]> solutionFromSteps(int[] steps) {
@@ -76,6 +79,10 @@ public class SATProblem {
             return false;  // Any false clause is enough to spoil satisfaction.
         }
         return true;  // No clause was falsified by any literal.
+    }
+
+    public static SATProblem parseFrom(String s) {
+        return parseFrom(new StringReader(s));
     }
 
     public static SATProblem parseFrom(Reader r) {
@@ -121,5 +128,31 @@ public class SATProblem {
             throw new IllegalArgumentException("Parse error", e);
         }
         return sat;
+    }
+
+    public SATProblem to3SAT() {
+        if (this.height <= 3) return this;
+        List<ImmutableList<Integer>> newClauses = new ArrayList<>();
+        int nextVariable = nVariables + 1;
+        for (ImmutableList<Integer> c : clauses) {
+            if (c.size() <= 3) {
+                newClauses.add(c);
+            } else {
+                // ImmutableList.Builder<Integer> b = new ImmutableList.Builder<>();
+                // Add the leftmost part
+                final int N = c.size();
+                newClauses.add(ImmutableList.of(c.get(0), c.get(1), encodeLiteral(nextVariable)));
+                // Add the middle parts
+                for (int j = 2; j < N - 2; ++j, ++nextVariable) {
+                    newClauses.add(ImmutableList.of(c.get(j), encodeLiteral(-nextVariable), encodeLiteral(nextVariable+1)));
+                }
+                // Add the last clause
+                newClauses.add(ImmutableList.of(encodeLiteral(-nextVariable), c.get(N - 2), c.get(N - 1)));
+                ++nextVariable;
+            }
+        }
+        SATProblem q = new SATProblem(nextVariable-1);
+        newClauses.forEach(q::addEncodedClause);
+        return q;
     }
 }

@@ -17,6 +17,7 @@ repositories {
 dependencies {
     testCompile("junit", "junit", "4.12")
     testCompile("com.github.npathai", "hamcrest-optional", "2.0.0")
+    testCompile("org.hamcrest", "hamcrest-library", "1.3")
     compile("com.google.guava", "guava", "23.5-jre")
     compile("org.apache.logging.log4j", "log4j-api", "2.10.0")
     compile("org.apache.logging.log4j", "log4j-core", "2.10.0")

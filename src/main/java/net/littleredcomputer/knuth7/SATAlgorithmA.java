@@ -67,6 +67,8 @@ public class SATAlgorithmA extends AbstractSATSolver {
 
         LOOP: while (true) {
             // System.out.println("solving. state " + state + " d " + d);
+            ++stepCount;
+            if (stepCount % logCheckSteps == 0) maybeReportProgress(m);
             switch (state) {
                 case 2:  // Choose.
                     l = 2 * d;
