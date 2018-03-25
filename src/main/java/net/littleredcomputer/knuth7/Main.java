@@ -46,6 +46,7 @@ public class Main {
             case "A": return SATAlgorithmA::new;
             case "B": return SATAlgorithmB::new;
             case "D": return SATAlgorithmD::new;
+            case "L3": return (p) -> new SATAlgorithmL(p.to3SAT());
             default: throw new IllegalArgumentException("Unknown algorithm: " + a);
         }
     }

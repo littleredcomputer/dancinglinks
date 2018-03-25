@@ -7,14 +7,17 @@ import org.apache.logging.log4j.message.FormattedMessage;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 public abstract class AbstractSATSolver {
     private static final Logger log = LogManager.getFormatterLogger(AbstractSATSolver.class);
     final int logCheckSteps = 1000;
     protected final SATProblem problem;
-    long stepCount;
+    long stepCount, lastStepCount;
     private final String name;
     private Duration logInterval = Duration.ofMillis(1000);
     private Instant lastLogTime = Instant.EPOCH;
@@ -30,6 +33,7 @@ public abstract class AbstractSATSolver {
     void start() {
         stopwatch.start();
         lastLogTime = Instant.now();
+        lastStepCount = stepCount;
     }
 
     private final static int initialStateSegment = 81;
@@ -48,9 +52,13 @@ public abstract class AbstractSATSolver {
 
     void maybeReportProgress(Supplier<String> s) {
         Instant now = Instant.now();
-        if (Duration.between(lastLogTime, now).compareTo(logInterval) < 0) return;
-        log.info(() -> new FormattedMessage("%s %d steps %s %s", name, stepCount, stopwatch, s.get()));
+
+        Duration tween = Duration.between(lastLogTime, now);
+        if (tween.compareTo(logInterval) < 0) return;
+        final double perSec = 1e3 * (stepCount - lastStepCount) / tween.toMillis();
+        log.info(() -> new FormattedMessage("%s %d steps %s %.0f/sec %s", name, stepCount, stopwatch, perSec, s.get()));
         lastLogTime = now;
+        lastStepCount = stepCount;
     }
 
     void maybeReportProgress(int[] m) {
