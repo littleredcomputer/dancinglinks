@@ -10,9 +10,9 @@ public class SATAlgorithmB extends AbstractSATSolver {
 
     @Override
     public Optional<boolean[]> solve() {
+        start();
         final int nVariables = problem.nVariables();
         final int nClauses = problem.nClauses();
-
         int[] m = new int[nVariables + 1];
         int[] START = new int[nClauses + 1];
         int[] L = new int[problem.nLiterals()];

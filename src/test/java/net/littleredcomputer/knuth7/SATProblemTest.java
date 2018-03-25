@@ -6,6 +6,7 @@ import org.junit.Test;
 import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -52,8 +53,8 @@ public class SATProblemTest {
     private static List<Function<SATProblem, Optional<boolean[]>>> algorithms = ImmutableList.of(
             p -> new SATAlgorithmA(p).solve(),
             p -> new SATAlgorithmB(p).solve(),
-            p -> new SATAlgorithmD(p).solve() /* ,
-            p -> new SATAlgorithmL(p.to3SAT()).solve() */
+            p -> new SATAlgorithmD(p).solve(),
+            p -> new SATAlgorithmL(p.to3SAT()).solve()
     );
 
     @Test
@@ -186,10 +187,10 @@ public class SATProblemTest {
     @Test public void w3_3L3() { assertThat(waerden(3, 3, p -> new SATAlgorithmL(p.to3SAT())), is(9)); }
     @Test public void w3_4L3() { assertThat(waerden(3, 4, p -> new SATAlgorithmL(p.to3SAT())), is(18)); }
     @Test public void w4_3L3() { assertThat(waerden(4, 3, p -> new SATAlgorithmL(p.to3SAT())), is(18)); }
-    @Test public void w4_4L3() { assertThat(waerden(4, 4, p -> new SATAlgorithmL(p.to3SAT())), is(35)); }
-    @Test public void w3_6L3() { assertThat(waerden(3, 6, p -> new SATAlgorithmL(p.to3SAT())), is(32)); }
-    @Test public void w4_5L3() { assertThat(waerden(4, 5, p -> new SATAlgorithmL(p.to3SAT())), is(55)); }
-    @Test public void w5_4L3() { assertThat(waerden(5, 4, p -> new SATAlgorithmL(p.to3SAT())), is(55)); }
+    //@Test public void w4_4L3() { assertThat(waerden(4, 4, p -> new SATAlgorithmL(p.to3SAT())), is(35)); }
+    //@Test public void w3_6L3() { assertThat(waerden(3, 6, p -> new SATAlgorithmL(p.to3SAT())), is(32)); }
+    //@Test public void w4_5L3() { assertThat(waerden(4, 5, p -> new SATAlgorithmL(p.to3SAT())), is(55)); }
+    //@Test public void w5_4L3() { assertThat(waerden(5, 4, p -> new SATAlgorithmL(p.to3SAT())), is(55)); }
     @Test public void w6_3L3() { assertThat(waerden(6, 3, p -> new SATAlgorithmL(p.to3SAT())), is(32)); }
 
     @Test public void w3_3L() { assertThat(waerden(3, 3, SATAlgorithmL::new), is(9)); }
@@ -236,7 +237,7 @@ public class SATProblemTest {
                 columns.get(i).set(row, true);
                 columns.get(n + j).set(row, true);
                 columns.get(n + j + i + 2).set(row, true);
-                System.out.printf("row %d means set %d in columns %d and %d\n", row, i, j, j+i+2);
+                //System.out.printf("row %d means set %d in columns %d and %d\n", row+1, i, j, j+i+2);
                 ++row;
             }
         }
@@ -260,20 +261,12 @@ public class SATProblemTest {
         // (dual) placement). When i mod 4 in {1, 2}, the solver should refute the problem instance.
         List<Optional<Integer>> expected = range.get().mapToObj(i -> i % 4 == 0 || i % 4 == 3 ? Optional.of(i) : Optional.<Integer>empty()).collect(Collectors.toList());
         algorithms.forEach(a -> {
-            Stream<Optional<Integer>> observed = range.get().mapToObj(i -> a.apply(langfordProblem(i)).map(this::countTrueBits));
+            Stream<Optional<Integer>> observed = range.get().mapToObj(i -> {
+                SATProblem Li = langfordProblem(i);
+                return a.apply(Li).map(k -> Arrays.copyOfRange(k, 0, Li.nVariables())).map(this::countTrueBits);
+            });
             assertThat(observed.collect(Collectors.toList()), is(expected));
         });
-    }
-
-    // These are redundant but it's useful to have a few small tests lying around for debugging
-    @Test
-    public void langford3() {
-        SATProblem p = langfordProblem(3);
-        algorithms.forEach(a -> assertThat(a.apply(p).map(this::toBinaryString), isPresentAnd(startsWith("001010001"))));
-        // the string 001010001 corresponds to the (0-based) solution 120102.
-        // the string           corresponds to ...                    201021 (but this is just the reverse. maybe we should add the tie-breaking clause to langford?
-        // doing so would harmonize it with Knuth's definition.
-
     }
 
     @Test
@@ -291,13 +284,9 @@ public class SATProblemTest {
     @Test
     public void langford4D() {
         SATProblem p = langfordProblem(4).to3SAT();
-        assertThat(new SATAlgorithmD(p).solve().map(p::evaluate), isPresentAndIs(true));
-    }
-
-    @Test
-    public void langford4() {
-        SATProblem p = langfordProblem(4);
-        algorithms.forEach(a -> assertThat(a.apply(p).map(this::toBinaryString), isPresentAnd(startsWith("000010100000100001"))));
+        Optional<boolean[]> sol = new SATAlgorithmD(p).solve();
+        assertThat(sol.map(p::evaluate), isPresentAndIs(true));
+        assertThat(sol.map(this::toBinaryString), isPresentAndIs("000010100000100001111000011110001101"));
     }
 
     void threeSat(int n) {

@@ -14,6 +14,7 @@ public class SATAlgorithmA extends AbstractSATSolver {
 
     @Override
     public Optional<boolean[]> solve() {
+        start();
         final int nVariables = problem.nVariables();
         final int nClauses = problem.nClauses();
         int nCells = 2 + 2 * nVariables + problem.nLiterals();

@@ -11,10 +11,10 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 public abstract class AbstractSATSolver {
-    protected static final Logger log = LogManager.getFormatterLogger(AbstractSATSolver.class);
+    private static final Logger log = LogManager.getFormatterLogger(AbstractSATSolver.class);
     final int logCheckSteps = 1000;
     protected final SATProblem problem;
-    protected long stepCount;
+    long stepCount;
     private final String name;
     private Duration logInterval = Duration.ofMillis(1000);
     private Instant lastLogTime = Instant.EPOCH;
@@ -41,7 +41,7 @@ public abstract class AbstractSATSolver {
             s.append("...");
             for (int i = state.length-finalStateSegment; i < state.length; ++i) s.append(state[i]);
         } else {
-            for (int i = 0; i < state.length; ++i) s.append(state[i]);
+            for (int aState : state) s.append(aState);
         }
         return s.toString();
     }

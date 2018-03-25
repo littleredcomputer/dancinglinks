@@ -14,7 +14,6 @@ public class SATAlgorithmD extends AbstractSATSolver {
     public Optional<boolean[]> solve() {
         start();
         final int nVariables = problem.nVariables();
-        long stepCount = 0;
         int[] m = new int[nVariables + 1];
         int[] x = new int[nVariables + 1];
         int[] H = new int[nVariables + 1];
