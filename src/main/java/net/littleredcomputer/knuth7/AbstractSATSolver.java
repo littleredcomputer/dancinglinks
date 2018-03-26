@@ -7,17 +7,15 @@ import org.apache.logging.log4j.message.FormattedMessage;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalUnit;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-public abstract class AbstractSATSolver {
+abstract class AbstractSATSolver {
     private static final Logger log = LogManager.getFormatterLogger(AbstractSATSolver.class);
     final int logCheckSteps = 1000;
     protected final SATProblem problem;
-    long stepCount, lastStepCount;
+    long stepCount;
+    private long lastStepCount;
     private final String name;
     private Duration logInterval = Duration.ofMillis(1000);
     private Instant lastLogTime = Instant.EPOCH;

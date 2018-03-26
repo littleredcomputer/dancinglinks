@@ -69,7 +69,7 @@ Sudoku.fromBoardString(ex28c).solutions().collect(Collectors.toList())
 //  "934 517 268 862 493 175 751 862 493 275 981 634 649 235 817 183 746 529 417 659 382 328 174 956 596 328 741 "]
 ```
 
-The solver is fast; it can generate an answer without about 15sm.
+The solver is fast; it can generate an answer within about 15ms.
 
 ### Word Find
 

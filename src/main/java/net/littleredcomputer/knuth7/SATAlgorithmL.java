@@ -1,5 +1,6 @@
 package net.littleredcomputer.knuth7;
 
+import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.stack.TIntStack;
 import gnu.trove.stack.array.TIntArrayStack;
@@ -15,13 +16,13 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private static int PT = RT - 2;
 
     // These next 4 arrays all grow in sync.
-    private final TIntArrayList U = new TIntArrayList();
-    private final TIntArrayList V = new TIntArrayList();
-    private final TIntArrayList LINK = new TIntArrayList();
-    private final TIntArrayList NEXT = new TIntArrayList();
+    private final TIntList U = new TIntArrayList();
+    private final TIntList V = new TIntArrayList();
+    private final TIntList LINK = new TIntArrayList();
+    private final TIntList NEXT = new TIntArrayList();
     private final TIntArrayList FORCE = new TIntArrayList();
 
-    private final List<TIntArrayList> BIMP;
+    private final List<TIntList> BIMP;
     private final List<Integer> TIMP;
     private final int[] VAR;
     private final int[] VAL;
@@ -149,7 +150,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
             return false;
         }
         for (; H < E; ++H) {
-            TIntArrayList bimpl = BIMP.get(R[H]);
+            TIntList bimpl = BIMP.get(R[H]);
             for (int i = 0; i < BSIZE[R[H]]; ++i) {
                 if (!takeAccountOf(bimpl.get(i))) return false;
             }
@@ -159,7 +160,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
     /* True if BIMP[b] contains l. */
     private boolean bimpContains(int b, int l) {
-        TIntArrayList bimpl = BIMP.get(b);
+        TIntList bimpl = BIMP.get(b);
         for (int i = 0; i < BSIZE[b]; ++i) if (bimpl.get(i) == l) return true;
         return false;
     }
@@ -171,7 +172,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
             ISTACKb.push(b);
             ISTACKs.push(BSIZE[b]);
         }
-        TIntArrayList bimp = BIMP.get(b);
+        TIntList bimp = BIMP.get(b);
         if (bimp.size() > BSIZE[b]) bimp.set(BSIZE[b], l);
         else if (bimp.size() == BSIZE[b]) bimp.add(l);
         else throw new IllegalStateException("bimp size invariant violation");
@@ -243,7 +244,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         for (int l = 2; l <= 2*nVariables+1; ++l) {
             if (BSIZE[l] < 0) throw new IllegalStateException(String.format("bad BIMP at %d (%d): %d", l, dl(l), BSIZE[l]));
             if (BSIZE[l] > 0) {
-                TIntArrayList b = BIMP.get(l);
+                TIntList b = BIMP.get(l);
                 StringBuilder sb = new StringBuilder();
                 sb.append(String.format("  %3d: ", dl(l)));
                 for (int i = 0; i < BSIZE[l]; ++i) sb.append(dl(b.get(i))).append(' ');
@@ -260,7 +261,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     }
 
     private String stateToString() {
-        return Arrays.stream(VAL).skip(1).mapToObj(i -> i == 0 ? "." : (i&1) == 0 ? "1" : "0").collect(Collectors.joining());
+        return Arrays.stream(VAL).skip(1).mapToObj(i -> i == 0 ? "\u00b7" : (i&1) == 0 ? "1" : "0").collect(Collectors.joining());
     }
 
     @Override
@@ -282,9 +283,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
             }
             if (log.isTraceEnabled()) log.trace(">>>> step %d state %d", stepCount, state);
             switch (state) {
-                case 0:
-                case 1:
-                    throw new IllegalStateException("Internal error: illegal state " + state);
                 case 2:  // New node.
                     if (FORCE.size() > 0) {
                         state = 5;
@@ -449,13 +447,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         --E;
                         int X = R[E]>>1;
                         // reactivate the TIMP pairs that involve X and restore X to the free list (ex. 137)
-                        for (int l0 = 2*X+1; l0 >= 2*X; --l0) {
-                            // We have to work in the reverse order than we worked in step 7.
-                            // We really hope not to have to do any memory allocation in the
-                            // SAT solving loop. For the present we'll endure it while we get
-                            // this working. Real solutions might involve having a PREV array
-                            // to allow traversal in the opposite order of NEXT.
-
+                        for (int l0 = 2*X + 1; l0 >= 2*X; --l0) {
                             if (log.isTraceEnabled()) log.trace("Reactivating %d\n",dl(l0));
                             // Knuth insists (in the printed fascicle) that the downdating of TIMP should
                             // happen in the reverse order of the updating, which would seem to argue for
@@ -465,8 +457,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
                             for (int p = TIMP.get(l0), tcount = 0; tcount < TSIZE[l0]; p = NEXT.get(p), ++tcount) {
                                 int u0 = U.get(p);
                                 int v = V.get(p);
-                                ++TSIZE[v^1];
-                                ++TSIZE[u0^1];
+                                ++TSIZE[v ^ 1];
+                                ++TSIZE[u0 ^ 1];
                             }
                         }
                         VAL[X] = 0;
@@ -497,7 +489,11 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     F = BACKF[d];
                     state = 12;
                     continue;
+                default:
+                    throw new IllegalStateException("Internal error: illegal state " + state);
             }
         }
     }
+
+
 }

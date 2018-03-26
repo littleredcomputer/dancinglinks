@@ -17,7 +17,6 @@ import java.util.stream.Stream;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.*;
 import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.startsWith;
 import static org.hamcrest.number.OrderingComparison.greaterThan;
 import static org.junit.Assert.assertThat;
 
@@ -48,8 +47,9 @@ public class SATProblemTest {
         SATProblem.parseFrom(new StringReader("c unclosed clause\np cnf 3 2\n1 2 3 0\n2 3 -1 0\n-2 -3"));
     }
 
-    private static String ex6 = "p cnf 4 8\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0 -4 1 -2 0";
-    private static String ex7 = "p cnf 4 7\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0";
+    private static SATProblem ex6 = SATProblem.parseFrom("p cnf 4 8\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0 -4 1 -2 0");
+    private static SATProblem ex7 = SATProblem.parseFrom("p cnf 4 7\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0");
+
     private static List<Function<SATProblem, Optional<boolean[]>>> algorithms = ImmutableList.of(
             p -> new SATAlgorithmA(p).solve(),
             p -> new SATAlgorithmB(p).solve(),
@@ -59,14 +59,12 @@ public class SATProblemTest {
 
     @Test
     public void ex7() {
-        SATProblem p = SATProblem.parseFrom(new StringReader(ex7));
-        algorithms.forEach(a -> assertThat(a.apply(p), isPresentAndIs(new boolean[]{false, true, false, true})));
+        algorithms.forEach(a -> assertThat(a.apply(ex7), isPresentAndIs(new boolean[]{false, true, false, true})));
     }
 
     @Test
     public void ex6() {
-        SATProblem p = SATProblem.parseFrom(new StringReader(ex6));
-        algorithms.forEach(a -> assertThat(a.apply(p), isEmpty()));
+        algorithms.forEach(a -> assertThat(a.apply(ex6), isEmpty()));
     }
 
     private SATProblem fromResource(String name) {
@@ -75,6 +73,7 @@ public class SATProblemTest {
 
     private final SATProblem zebra = fromResource("zebra.cnf");
     private final SATProblem quinn = fromResource("quinn.cnf");
+    private final SATProblem dubois = fromResource("dubois20.cnf");
 
     private String toBinaryString(boolean[] bs) {
         StringBuilder s = new StringBuilder();
@@ -289,7 +288,7 @@ public class SATProblemTest {
         assertThat(sol.map(this::toBinaryString), isPresentAndIs("000010100000100001111000011110001101"));
     }
 
-    void threeSat(int n) {
+    private void threeSat(int n) {
         String vars = IntStream.range(1, n+1).mapToObj(Integer::toString).collect(Collectors.joining(" ")) + " 0";
         String cnf = String.format("p cnf %d 1\n%s\n", n, vars);
         SATProblem p = SATProblem.parseFrom(cnf);
@@ -303,7 +302,7 @@ public class SATProblemTest {
         assertThat(q.nClauses(), is(n-2));
         Optional<boolean[]> qsol = new SATAlgorithmA(q).solve();
         assertThat(qsol, isPresent());
-        assertThat(countTrueBits(qsol.get()), is(greaterThan(0)));
+        qsol.ifPresent(bs -> assertThat(countTrueBits(bs), is(greaterThan(0))));
     }
 
     @Test public void threeSatTest() {
@@ -332,13 +331,10 @@ public class SATProblemTest {
         assertThat(new SATAlgorithmL(quinn).solve().map(quinn::evaluate), isPresentAndIs(true));
     }
 
-    //Too hard for algorithm A or B, at least as a unit test
-
-//    @Test
-//    public void dubois20() {
-//        assertThat(SATProblem.parseFrom(new InputStreamReader(this.getClass().getClassLoader().getResourceAsStream("dubois20.cnf"))).algorithmA(),
-//                is(Optional.empty()));
-//
-//    }
+    @Test
+    public void dubois() {
+        assertThat(new SATAlgorithmL(dubois).solve().map(dubois::evaluate), isEmpty());
+        assertThat(new SATAlgorithmD(dubois).solve().map(dubois::evaluate), isEmpty());
+    }
 }
 

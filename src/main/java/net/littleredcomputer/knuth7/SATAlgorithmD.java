@@ -67,7 +67,7 @@ public class SATAlgorithmD extends AbstractSATSolver {
 
         int state = 2;
         boolean debug = false;
-        while(true) {
+        while (true) {
             ++stepCount;
             if (stepCount % logCheckSteps == 0) maybeReportProgress(m);
             // Algorithm D. The case state labels correspond to Knuth's numbering of the steps.
@@ -93,7 +93,6 @@ public class SATAlgorithmD extends AbstractSATSolver {
                         System.out.println(" link: " + Arrays.toString(LINK));
                         System.out.println("start: " + Arrays.toString(START));
                     }
-
 
                     if (t == 0) {
                         boolean[] bs = new boolean[nVariables];
