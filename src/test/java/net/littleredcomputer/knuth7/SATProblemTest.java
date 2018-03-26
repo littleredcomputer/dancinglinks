@@ -188,7 +188,7 @@ public class SATProblemTest {
     @Test public void w3_4L3() { assertThat(waerden(3, 4, p -> new SATAlgorithmL(p.to3SAT())), is(18)); }
     @Test public void w4_3L3() { assertThat(waerden(4, 3, p -> new SATAlgorithmL(p.to3SAT())), is(18)); }
     //@Test public void w4_4L3() { assertThat(waerden(4, 4, p -> new SATAlgorithmL(p.to3SAT())), is(35)); }
-    //@Test public void w3_6L3() { assertThat(waerden(3, 6, p -> new SATAlgorithmL(p.to3SAT())), is(32)); }
+    @Test public void w3_6L3() { assertThat(waerden(3, 6, p -> new SATAlgorithmL(p.to3SAT())), is(32)); }
     //@Test public void w4_5L3() { assertThat(waerden(4, 5, p -> new SATAlgorithmL(p.to3SAT())), is(55)); }
     //@Test public void w5_4L3() { assertThat(waerden(5, 4, p -> new SATAlgorithmL(p.to3SAT())), is(55)); }
     @Test public void w6_3L3() { assertThat(waerden(6, 3, p -> new SATAlgorithmL(p.to3SAT())), is(32)); }

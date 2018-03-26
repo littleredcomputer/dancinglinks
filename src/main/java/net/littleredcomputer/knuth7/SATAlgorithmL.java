@@ -1,10 +1,8 @@
 package net.littleredcomputer.knuth7;
 
-import com.google.common.collect.Lists;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.stack.TIntStack;
 import gnu.trove.stack.array.TIntArrayStack;
-import javafx.util.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import java.util.*;
@@ -21,6 +19,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private final TIntArrayList V = new TIntArrayList();
     private final TIntArrayList LINK = new TIntArrayList();
     private final TIntArrayList NEXT = new TIntArrayList();
+    private final TIntArrayList FORCE = new TIntArrayList();
+
     private final List<TIntArrayList> BIMP;
     private final List<Integer> TIMP;
     private final int[] VAR;
@@ -68,6 +68,74 @@ public class SATAlgorithmL extends AbstractSATSolver {
         BSIZE = new int[2 * nVariables + 2];
         IST = new int[2 * nVariables + 2];
         R = new int[nVariables+1];  // stack to record the names of literals that have received values
+
+
+        // XXX consider moving tableau creation to the constructor
+        Set<Integer> units = new HashSet<>();
+        List<Set<Integer>> oBIMP = new ArrayList<>(2 * nVariables + 2);
+        for (int i = 0; i < 2 * nVariables + 2; ++i) oBIMP.add(new HashSet<>());
+        for (int i = 0; i < problem.nClauses(); ++i) {
+            List<Integer> clause = problem.getClause(i);
+            switch (clause.size()) {
+                case 1: {
+                    // Put it in the FORCE array, unless it is contradictory
+                    final int u = clause.get(0);
+                    if (units.contains(u ^ 1))
+                        throw new IllegalArgumentException("Contradictory unit clauses involving variable " + (u >> 1) + " found");
+                    units.add(u);
+                    break;
+                }
+                case 2: {
+                    // Put it in the BIMP.
+                    final int u = clause.get(0), v = clause.get(1);
+                    oBIMP.get(u ^ 1).add(v);
+                    oBIMP.get(v ^ 1).add(u);
+                    break;
+                }
+                case 3: {
+                    // Put it in the TIMP
+                    final int u = clause.get(0), v = clause.get(1), w = clause.get(2);
+
+                    int z = U.size();
+                    U.add(v);
+                    V.add(w);
+
+                    U.add(w);
+                    V.add(u);
+
+                    U.add(u);
+                    V.add(v);
+
+                    LINK.add(z + 1);
+                    LINK.add(z + 2);
+                    LINK.add(z);
+
+                    NEXT.add(TIMP.get(u ^ 1));
+                    NEXT.add(TIMP.get(v ^ 1));
+                    NEXT.add(TIMP.get(w ^ 1));
+
+                    TIMP.set(u ^ 1, z);
+                    TIMP.set(v ^ 1, z + 1);
+                    TIMP.set(w ^ 1, z + 2);
+
+                    ++TSIZE[u ^ 1];
+                    ++TSIZE[v ^ 1];
+                    ++TSIZE[w ^ 1];
+
+                    break;
+                }
+                default:
+                    throw new IllegalArgumentException("Algorithm L can only cope with 3SAT at the moment " + clause.size());
+            }
+        }
+        for (int i = 0; i < 2 * nVariables + 2; ++i) BIMP.get(i).addAll(oBIMP.get(i));
+        Arrays.setAll(BSIZE, i -> BIMP.get(i).size());
+        FORCE.addAll(units);
+        for (int k = 0; k < nVariables; ++k) {
+            VAR[k] = k + 1;
+            INX[k + 1] = k;
+        }
+
     }
 
     /**
@@ -85,9 +153,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
             for (int i = 0; i < BSIZE[R[H]]; ++i) {
                 if (!takeAccountOf(bimpl.get(i))) return false;
             }
-//            if (!bimpForEach(R[H], this::takeAccountOf)) {
-//                return false;
-//            }
         }
         return true;
     }
@@ -107,15 +172,11 @@ public class SATAlgorithmL extends AbstractSATSolver {
             ISTACKs.push(BSIZE[b]);
         }
         TIntArrayList bimp = BIMP.get(b);
-        if (bimp.size() > BSIZE[b]) {
-            bimp.set(BSIZE[b], l);
-        } else if (bimp.size() == BSIZE[b]) {
-            bimp.add(l);
-        } else throw new IllegalStateException("bimp size invariant violation");
+        if (bimp.size() > BSIZE[b]) bimp.set(BSIZE[b], l);
+        else if (bimp.size() == BSIZE[b]) bimp.add(l);
+        else throw new IllegalStateException("bimp size invariant violation");
         ++BSIZE[b];
     }
-
-    // TODO: from the bottom up, implement an escape discipline for the CONFLICT cases in the subroutines.
 
     private static int dl(int literal) { return SATProblem.decodeLiteral(literal); }
     /**
@@ -205,87 +266,13 @@ public class SATAlgorithmL extends AbstractSATSolver {
     @Override
     public Optional<boolean[]> solve() {
         start();
-        // XXX consider moving tableau creation to the constructor
         final int nVariables = problem.nVariables();
-        Set<Integer> units = new HashSet<>();
-        List<Set<Integer>> oBIMP = new ArrayList<>(2 * nVariables + 2);
-        for (int i = 0; i < 2 * nVariables + 2; ++i) oBIMP.add(new HashSet<>());
-        for (int i = 0; i < problem.nClauses(); ++i) {
-            List<Integer> clause = problem.getClause(i);
-            switch (clause.size()) {
-                case 1: {
-                    // Put it in the FORCE array, unless it is contradictory
-                    final int u = clause.get(0);
-                    if (units.contains(u ^ 1))
-                        throw new IllegalArgumentException("Contradictory unit clauses involving variable " + (u >> 1) + " found");
-                    units.add(u);
-                    break;
-                }
-                case 2: {
-                    // Put it in the BIMP.
-                    final int u = clause.get(0), v = clause.get(1);
-                    oBIMP.get(u ^ 1).add(v);
-                    oBIMP.get(v ^ 1).add(u);
-                    break;
-                }
-                case 3: {
-                    // Put it in the TIMP
-                    final int u = clause.get(0), v = clause.get(1), w = clause.get(2);
-
-                    int z = U.size();
-                    U.add(v);
-                    V.add(w);
-
-                    U.add(w);
-                    V.add(u);
-
-                    U.add(u);
-                    V.add(v);
-
-                    LINK.add(z + 1);
-                    LINK.add(z + 2);
-                    LINK.add(z);
-
-                    NEXT.add(TIMP.get(u ^ 1));
-                    NEXT.add(TIMP.get(v ^ 1));
-                    NEXT.add(TIMP.get(w ^ 1));
-
-                    TIMP.set(u ^ 1, z);
-                    TIMP.set(v ^ 1, z + 1);
-                    TIMP.set(w ^ 1, z + 2);
-
-                    ++TSIZE[u ^ 1];
-                    ++TSIZE[v ^ 1];
-                    ++TSIZE[w ^ 1];
-
-                    break;
-                }
-                default:
-                    throw new IllegalArgumentException("Algorithm L can only cope with 3SAT at the moment " + clause.size());
-            }
-        }
-        for (int i = 0; i < 2 * nVariables + 2; ++i) BIMP.get(i).addAll(oBIMP.get(i));
-        Arrays.setAll(BSIZE, i -> BIMP.get(i).size());
-        TIntArrayList FORCE = new TIntArrayList();
-        FORCE.addAll(units);
         int N = VAR.length;
-        for (int k = 0; k < nVariables; ++k) {
-            VAR[k] = k + 1;
-            INX[k + 1] = k;
-        }
         int d = 0;
         int CONFLICT = 0;
-
         int state = 2;
         int l = 0;
         int L = 0;
-
-//        System.out.printf("    U: %s\n", U);
-//        System.out.printf("    V: %s\n", V);
-//        System.out.printf(" NEXT: %s\n", NEXT);
-//        System.out.printf(" LINK: %s\n", LINK);
-//        System.out.printf(" TIMP: %s\n", TIMP);
-//        System.out.printf("TSIZE: %s\n", Arrays.toString(TSIZE));
 
         STEP:
         while (true) {
@@ -305,8 +292,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     }
                     // Step X1:  Satisfied?
                     if (F == nVariables) {
-                        log.trace("returning because SAT %s", this::stateToString);
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    boolean sat[] = new boolean[nVariables];
+                        boolean sat[] = new boolean[nVariables];
                         for (int i = 1; i <= nVariables; ++i) sat[i-1] = (VAL[i] & 1) == 0;
                         return Optional.of(sat);
                     }
@@ -319,9 +305,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     // If we had algorithm X, we could make a smart choice.
                     // Algorithm X can also reply "0".  For now, we're going
                     // to just pick the first literal that's free.
-
-                    // Where we left off: that dumb pick above is picking the same literal each time.
-
                     if (0 >= N) throw new IllegalStateException("Can't find a free var in step 3");
                     l = 2*VAR[0]+1; // trivial heuristic: deny the first free variable
                     if (l == 0) {
@@ -337,8 +320,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 case 4:  // Try l.
 
                     if (log.isTraceEnabled()) print();
-                    // XXX consider delaying computation of stateToString in log.trace messages
-
                     if (log.isTraceEnabled()) log.trace("d=%d: Trying %d", d, dl(l));
                     // u = 1;            // FIXME: is u just the size of the FORCE array? Can we eliminate that variable?
                     // FORCE.add(l);
@@ -393,7 +374,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                             int s = TSIZE[u0 ^ 1] - 1;
                             TSIZE[u0 ^ 1] = s;
                             int t = TIMP.get(u0 ^ 1);
-                            for (int i = 0; i < s; ++i) t = NEXT.get(t); // XXX i = 1 or 0 here?
+                            for (int i = 0; i < s; ++i) t = NEXT.get(t);
                             if (pp != t) {
                                 int uu = U.get(t);
                                 int vv = V.get(t);
@@ -408,18 +389,16 @@ public class SATAlgorithmL extends AbstractSATSolver {
                                 V.set(t, l0 ^ 1);
                                 LINK.set(t, ppp);
 
-                                // NOT IN KNUTH: reset pp, ppp.  Initially this was below the following closing brace, but it looks
-                                // like it could be here, since the assignments to pp, ppp are otherwise unmolested
+                                // NOT IN KNUTH: reset pp, ppp.
                                 pp = LINK.get(p);
                                 ppp = LINK.get(pp);
                                 // END NOT IN KNUTH
-
                             }
                             // Then set...
                             s = TSIZE[v ^ 1] - 1;
                             TSIZE[v ^ 1] = s;
                             t = TIMP.get(v ^ 1);
-                            for (int i = 0; i < s; ++i) t = NEXT.get(t);  // XXX i = 1 or 0?
+                            for (int i = 0; i < s; ++i) t = NEXT.get(t);
                             if (ppp != t) {  // swap pairs by setting
                                 int uu = U.get(t);
                                 int vv = V.get(t);
@@ -478,33 +457,16 @@ public class SATAlgorithmL extends AbstractSATSolver {
                             // to allow traversal in the opposite order of NEXT.
 
                             if (log.isTraceEnabled()) log.trace("Reactivating %d\n",dl(l0));
-
-                            if (false) {
-                                Stack<Integer> stack = new Stack<>();
-
-                                // Allocation happens here for backtracking. Can it be avoided?
-                                for (int p = TIMP.get(l0), tcount = 0; tcount < TSIZE[l0]; p = NEXT.get(p), ++tcount) {
-                                    stack.push(p);
-                                }
-                                stack.forEach(p -> {
-                                    int u0 = U.get(p);
-                                    int v = V.get(p);
-                                    ++TSIZE[v^1];
-                                    ++TSIZE[u0^1];
-
-                                    // It is not entirely clear why this has to be done in a certain
-                                    // order (perhaps increasing TSIZE may reveal new entries in the
-                                    // TLIST, highlighting the fact that we need to check that in the
-                                    // iterations over TIMP.
-                                });
-
-                            } else {
-                                for (int p = TIMP.get(l0), tcount = 0; tcount < TSIZE[l0]; p = NEXT.get(p), ++tcount) {
-                                    int u0 = U.get(p);
-                                    int v = V.get(p);
-                                    ++TSIZE[v^1];
-                                    ++TSIZE[u0^1];
-                                }
+                            // Knuth insists (in the printed fascicle) that the downdating of TIMP should
+                            // happen in the reverse order of the updating, which would seem to argue for
+                            // traversing this linked list in reverse order. However, since each entry in
+                            // the TIMP list will point (via U and V) to two strictly other TIMP lists, it's
+                            // not clear why the order matters.
+                            for (int p = TIMP.get(l0), tcount = 0; tcount < TSIZE[l0]; p = NEXT.get(p), ++tcount) {
+                                int u0 = U.get(p);
+                                int v = V.get(p);
+                                ++TSIZE[v^1];
+                                ++TSIZE[u0^1];
                             }
                         }
                         VAL[X] = 0;
