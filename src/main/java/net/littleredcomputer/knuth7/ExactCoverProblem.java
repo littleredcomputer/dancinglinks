@@ -297,7 +297,7 @@ public class ExactCoverProblem {
         private final int[] x = new int[options.size()];
         private long stepCount = 0;
         private long solCount = 0;
-        private long logCheckSteps = 1000;
+        private long logCheckSteps = 10000;
 
         /**
          * Solve the exact cover problem. Announces each solution via supplied consumer and returns true.

@@ -12,7 +12,7 @@ import java.util.function.Supplier;
 
 abstract class AbstractSATSolver {
     private static final Logger log = LogManager.getFormatterLogger(AbstractSATSolver.class);
-    final int logCheckSteps = 1000;
+    final int logCheckSteps = 10000;
     protected final SATProblem problem;
     long stepCount;
     private long lastStepCount;

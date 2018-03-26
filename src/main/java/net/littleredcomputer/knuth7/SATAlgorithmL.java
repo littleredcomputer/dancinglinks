@@ -11,19 +11,19 @@ import java.util.stream.Collectors;
 
 public class SATAlgorithmL extends AbstractSATSolver {
     private static final Logger log = LogManager.getFormatterLogger();
-    private static int RT = 0x7ffffffe;
-    private static int NT = RT - 2;
-    private static int PT = RT - 2;
+    private static final int RT = 0x7ffffffe;
+    private static final int NT = RT - 2;
+    private static final int PT = RT - 2;
 
     // These next 4 arrays all grow in sync.
-    private final TIntList U = new TIntArrayList();
-    private final TIntList V = new TIntArrayList();
-    private final TIntList LINK = new TIntArrayList();
-    private final TIntList NEXT = new TIntArrayList();
+    private final TIntArrayList U = new TIntArrayList();
+    private final TIntArrayList V = new TIntArrayList();
+    private final TIntArrayList LINK = new TIntArrayList();
+    private final TIntArrayList NEXT = new TIntArrayList();
     private final TIntArrayList FORCE = new TIntArrayList();
 
-    private final List<TIntList> BIMP;
-    private final List<Integer> TIMP;
+    private final List<TIntArrayList> BIMP;
+    private final TIntArrayList TIMP;
     private final int[] VAR;
     private final int[] VAL;
     private final int[] DEC;
@@ -54,7 +54,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     SATAlgorithmL(SATProblem p) {
         super("L", p);
         final int nVariables = problem.nVariables();
-        TIMP = new ArrayList<>(2 * nVariables + 2);
+        TIMP = new TIntArrayList(2 * nVariables + 2);
         BIMP = new ArrayList<>(2 * nVariables + 2);
         for (int i = 0; i < 2 * nVariables + 2; ++i) BIMP.add(new TIntArrayList());
         for (int i = 0; i < 2 * nVariables + 2; ++i) TIMP.add(0);
@@ -167,14 +167,15 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
     /* Append l to BIMP[b], allowing for an undo in the future. */
     private void appendToBimp(int b, int l) {
+        final int bsize = BSIZE[b];
         if (IST[b] != ISTAMP) {
             IST[b] = ISTAMP;
             ISTACKb.push(b);
-            ISTACKs.push(BSIZE[b]);
+            ISTACKs.push(bsize);
         }
         TIntList bimp = BIMP.get(b);
-        if (bimp.size() > BSIZE[b]) bimp.set(BSIZE[b], l);
-        else if (bimp.size() == BSIZE[b]) bimp.add(l);
+        if (bimp.size() > bsize) bimp.set(bsize, l);
+        else if (bimp.size() == bsize) bimp.add(l);
         else throw new IllegalStateException("bimp size invariant violation");
         ++BSIZE[b];
     }
@@ -494,6 +495,4 @@ public class SATAlgorithmL extends AbstractSATSolver {
             }
         }
     }
-
-
 }

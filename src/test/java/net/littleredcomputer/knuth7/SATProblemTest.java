@@ -156,6 +156,8 @@ public class SATProblemTest {
     @Test public void w5_4A() { assertThat(waerden(5, 4, SATAlgorithmA::new), is(55)); }
     @Test public void w6_3A() { assertThat(waerden(6, 3, SATAlgorithmA::new), is(32)); }
 
+    //@Test public void w6_6B() { assertThat(waerden(6, 6, SATAlgorithmB::new), is(1132)); }
+
     @Test public void w3_3B() { assertThat(waerden(3, 3, SATAlgorithmB::new), is(9)); }
     @Test public void w3_4B() { assertThat(waerden(3, 4, SATAlgorithmB::new), is(18)); }
     @Test public void w4_3B() { assertThat(waerden(4, 3, SATAlgorithmB::new), is(18)); }
@@ -337,4 +339,3 @@ public class SATProblemTest {
         assertThat(new SATAlgorithmD(dubois).solve().map(dubois::evaluate), isEmpty());
     }
 }
-
