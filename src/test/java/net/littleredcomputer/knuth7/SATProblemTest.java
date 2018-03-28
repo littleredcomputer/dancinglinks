@@ -17,7 +17,6 @@ import java.util.stream.Stream;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.*;
 import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.startsWith;
 import static org.hamcrest.number.OrderingComparison.greaterThan;
 import static org.junit.Assert.assertThat;
 
@@ -330,6 +329,14 @@ public class SATProblemTest {
         SATProblem w = waerdenProblem(3,3,8);
         assertThat(new SATAlgorithmL(w).solve().map(w::evaluate), isPresentAndIs(true));
         assertThat(new SATAlgorithmL(quinn).solve().map(quinn::evaluate), isPresentAndIs(true));
+    }
+
+    @Test
+    public void algorithmX() {
+        SATProblem w = waerdenProblem(3, 3, 9);
+        SATAlgorithmL a = new SATAlgorithmL(w);
+        a.X();
+
     }
 
     //Too hard for algorithm A or B, at least as a unit test

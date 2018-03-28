@@ -1,12 +1,11 @@
 package net.littleredcomputer.knuth7;
 
-import com.google.common.collect.Lists;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.stack.TIntStack;
 import gnu.trove.stack.array.TIntArrayStack;
-import javafx.util.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -21,8 +20,9 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private final TIntArrayList V = new TIntArrayList();
     private final TIntArrayList LINK = new TIntArrayList();
     private final TIntArrayList NEXT = new TIntArrayList();
-    private final List<TIntArrayList> BIMP;
-    private final List<Integer> TIMP;
+    private final TIntArrayList FORCE = new TIntArrayList();
+    private final TIntArrayList[] BIMP;
+    private final int[] TIMP;
     private final int[] VAR;
     private final int[] VAL;
     private final int[] DEC;
@@ -53,10 +53,12 @@ public class SATAlgorithmL extends AbstractSATSolver {
     SATAlgorithmL(SATProblem p) {
         super("L", p);
         final int nVariables = problem.nVariables();
-        TIMP = new ArrayList<>(2 * nVariables + 2);
-        BIMP = new ArrayList<>(2 * nVariables + 2);
-        for (int i = 0; i < 2 * nVariables + 2; ++i) BIMP.add(new TIntArrayList());
-        for (int i = 0; i < 2 * nVariables + 2; ++i) TIMP.add(0);
+        TIMP = new int[2*nVariables+2];
+        BIMP = new TIntArrayList[2 * nVariables + 2];
+        for (int l = 2; l < 2 * nVariables + 2; ++l) {
+            BIMP[l] = new TIntArrayList();
+            TIMP[l] = 0;
+        }
         VAR = new int[nVariables];
         VAL = new int[nVariables+1];
         DEC = new int[nVariables];
@@ -68,6 +70,73 @@ public class SATAlgorithmL extends AbstractSATSolver {
         BSIZE = new int[2 * nVariables + 2];
         IST = new int[2 * nVariables + 2];
         R = new int[nVariables+1];  // stack to record the names of literals that have received values
+
+        Set<Integer> units = new HashSet<>();
+        List<Set<Integer>> oBIMP = new ArrayList<>(2 * nVariables + 2);
+        for (int i = 0; i < 2 * nVariables + 2; ++i) oBIMP.add(new HashSet<>());
+        for (int i = 0; i < problem.nClauses(); ++i) {
+            List<Integer> clause = problem.getClause(i);
+            switch (clause.size()) {
+                case 1: {
+                    // Put it in the FORCE array, unless it is contradictory
+                    final int u = clause.get(0);
+                    if (units.contains(u ^ 1))
+                        throw new IllegalArgumentException("Contradictory unit clauses involving variable " + (u >> 1) + " found");
+                    units.add(u);
+                    break;
+                }
+                case 2: {
+                    // Put it in the BIMP.
+                    final int u = clause.get(0), v = clause.get(1);
+                    oBIMP.get(u ^ 1).add(v);
+                    oBIMP.get(v ^ 1).add(u);
+                    break;
+                }
+                case 3: {
+                    // Put it in the TIMP
+                    final int u = clause.get(0), v = clause.get(1), w = clause.get(2);
+
+                    int z = U.size();
+                    U.add(v);
+                    V.add(w);
+
+                    U.add(w);
+                    V.add(u);
+
+                    U.add(u);
+                    V.add(v);
+
+                    LINK.add(z + 1);
+                    LINK.add(z + 2);
+                    LINK.add(z);
+
+                    NEXT.add(TIMP[u ^ 1]);
+                    NEXT.add(TIMP[v ^ 1]);
+                    NEXT.add(TIMP[w ^ 1]);
+
+                    TIMP[u ^ 1] = z;
+                    TIMP[v ^ 1] = z + 1;
+                    TIMP[w ^ 1] = z + 2;
+
+                    ++TSIZE[u ^ 1];
+                    ++TSIZE[v ^ 1];
+                    ++TSIZE[w ^ 1];
+
+                    break;
+                }
+                default:
+                    throw new IllegalArgumentException("Algorithm L can only cope with 3SAT at the moment " + clause.size());
+            }
+        }
+        for (int l = 2; l < 2 * nVariables + 2; ++l) {
+            BIMP[l].addAll(oBIMP.get(l));
+            BSIZE[l] = BIMP[l].size();
+        }
+        FORCE.addAll(units);
+        for (int k = 0; k < nVariables; ++k) {
+            VAR[k] = k + 1;
+            INX[k + 1] = k;
+        }
     }
 
     /**
@@ -81,7 +150,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
             return false;
         }
         for (; H < E; ++H) {
-            TIntArrayList bimpl = BIMP.get(R[H]);
+            TIntArrayList bimpl = BIMP[R[H]];
             for (int i = 0; i < BSIZE[R[H]]; ++i) {
                 if (!takeAccountOf(bimpl.get(i))) return false;
             }
@@ -94,7 +163,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
     /* True if BIMP[b] contains l. */
     private boolean bimpContains(int b, int l) {
-        TIntArrayList bimpl = BIMP.get(b);
+        TIntArrayList bimpl = BIMP[b];
         for (int i = 0; i < BSIZE[b]; ++i) if (bimpl.get(i) == l) return true;
         return false;
     }
@@ -106,7 +175,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
             ISTACKb.push(b);
             ISTACKs.push(BSIZE[b]);
         }
-        TIntArrayList bimp = BIMP.get(b);
+        TIntArrayList bimp = BIMP[b];
         if (bimp.size() > BSIZE[b]) {
             bimp.set(BSIZE[b], l);
         } else if (bimp.size() == BSIZE[b]) {
@@ -170,7 +239,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private String timpToString(int l) {
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("  %3d: ", dl(l)));
-        for (int i = 0, p = TIMP.get(l); i < TSIZE[l]; i++, p = NEXT.get(p)) {
+        for (int i = 0, p = TIMP[l]; i < TSIZE[l]; i++, p = NEXT.get(p)) {
             sb.append(dl(U.get(p))).append(':').append(dl(V.get(p))).append(' ');
         }
         return sb.toString();
@@ -182,7 +251,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         for (int l = 2; l <= 2*nVariables+1; ++l) {
             if (BSIZE[l] < 0) throw new IllegalStateException(String.format("bad BIMP at %d (%d): %d", l, dl(l), BSIZE[l]));
             if (BSIZE[l] > 0) {
-                TIntArrayList b = BIMP.get(l);
+                TIntArrayList b = BIMP[l];
                 StringBuilder sb = new StringBuilder();
                 sb.append(String.format("  %3d: ", dl(l)));
                 for (int i = 0; i < BSIZE[l]; ++i) sb.append(dl(b.get(i))).append(' ');
@@ -207,75 +276,9 @@ public class SATAlgorithmL extends AbstractSATSolver {
         start();
         // XXX consider moving tableau creation to the constructor
         final int nVariables = problem.nVariables();
-        Set<Integer> units = new HashSet<>();
-        List<Set<Integer>> oBIMP = new ArrayList<>(2 * nVariables + 2);
-        for (int i = 0; i < 2 * nVariables + 2; ++i) oBIMP.add(new HashSet<>());
-        for (int i = 0; i < problem.nClauses(); ++i) {
-            List<Integer> clause = problem.getClause(i);
-            switch (clause.size()) {
-                case 1: {
-                    // Put it in the FORCE array, unless it is contradictory
-                    final int u = clause.get(0);
-                    if (units.contains(u ^ 1))
-                        throw new IllegalArgumentException("Contradictory unit clauses involving variable " + (u >> 1) + " found");
-                    units.add(u);
-                    break;
-                }
-                case 2: {
-                    // Put it in the BIMP.
-                    final int u = clause.get(0), v = clause.get(1);
-                    oBIMP.get(u ^ 1).add(v);
-                    oBIMP.get(v ^ 1).add(u);
-                    break;
-                }
-                case 3: {
-                    // Put it in the TIMP
-                    final int u = clause.get(0), v = clause.get(1), w = clause.get(2);
-
-                    int z = U.size();
-                    U.add(v);
-                    V.add(w);
-
-                    U.add(w);
-                    V.add(u);
-
-                    U.add(u);
-                    V.add(v);
-
-                    LINK.add(z + 1);
-                    LINK.add(z + 2);
-                    LINK.add(z);
-
-                    NEXT.add(TIMP.get(u ^ 1));
-                    NEXT.add(TIMP.get(v ^ 1));
-                    NEXT.add(TIMP.get(w ^ 1));
-
-                    TIMP.set(u ^ 1, z);
-                    TIMP.set(v ^ 1, z + 1);
-                    TIMP.set(w ^ 1, z + 2);
-
-                    ++TSIZE[u ^ 1];
-                    ++TSIZE[v ^ 1];
-                    ++TSIZE[w ^ 1];
-
-                    break;
-                }
-                default:
-                    throw new IllegalArgumentException("Algorithm L can only cope with 3SAT at the moment " + clause.size());
-            }
-        }
-        for (int i = 0; i < 2 * nVariables + 2; ++i) BIMP.get(i).addAll(oBIMP.get(i));
-        Arrays.setAll(BSIZE, i -> BIMP.get(i).size());
-        TIntArrayList FORCE = new TIntArrayList();
-        FORCE.addAll(units);
-        int N = VAR.length;
-        for (int k = 0; k < nVariables; ++k) {
-            VAR[k] = k + 1;
-            INX[k + 1] = k;
-        }
         int d = 0;
         int CONFLICT = 0;
-
+        int N = VAR.length;
         int state = 2;
         int l = 0;
         int L = 0;
@@ -385,14 +388,14 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     INX[X] = N;
                     for (int l0 = 2 * X; l0 <= 2 * X + 1; ++l0) {
                         // System.out.printf("purging %d\n", dl(l0));
-                        for (int p = TIMP.get(l0), tcount = 0; tcount < TSIZE[l0]; p = NEXT.get(p), ++tcount) {
+                        for (int p = TIMP[l0], tcount = 0; tcount < TSIZE[l0]; p = NEXT.get(p), ++tcount) {
                             int u0 = U.get(p);
                             int v = V.get(p);
                             int pp = LINK.get(p);
                             int ppp = LINK.get(pp);
                             int s = TSIZE[u0 ^ 1] - 1;
                             TSIZE[u0 ^ 1] = s;
-                            int t = TIMP.get(u0 ^ 1);
+                            int t = TIMP[u0 ^ 1];
                             for (int i = 0; i < s; ++i) t = NEXT.get(t); // XXX i = 1 or 0 here?
                             if (pp != t) {
                                 int uu = U.get(t);
@@ -418,7 +421,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                             // Then set...
                             s = TSIZE[v ^ 1] - 1;
                             TSIZE[v ^ 1] = s;
-                            t = TIMP.get(v ^ 1);
+                            t = TIMP[v ^ 1];
                             for (int i = 0; i < s; ++i) t = NEXT.get(t);  // XXX i = 1 or 0?
                             if (ppp != t) {  // swap pairs by setting
                                 int uu = U.get(t);
@@ -438,7 +441,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     }
 
                     // Do step L8 for all pairs (u,v) in TIMP(L) then return to L6.
-                    for (int p = TIMP.get(L), tcount = 0; tcount < TSIZE[L]; p = NEXT.get(p), ++tcount) {
+                    for (int p = TIMP[L], tcount = 0; tcount < TSIZE[L]; p = NEXT.get(p), ++tcount) {
                         boolean conflict = !consider(U.get(p), V.get(p));
                         if (conflict) {
                             state = CONFLICT;
@@ -483,7 +486,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                                 Stack<Integer> stack = new Stack<>();
 
                                 // Allocation happens here for backtracking. Can it be avoided?
-                                for (int p = TIMP.get(l0), tcount = 0; tcount < TSIZE[l0]; p = NEXT.get(p), ++tcount) {
+                                for (int p = TIMP[l0], tcount = 0; tcount < TSIZE[l0]; p = NEXT.get(p), ++tcount) {
                                     stack.push(p);
                                 }
                                 stack.forEach(p -> {
@@ -499,7 +502,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                                 });
 
                             } else {
-                                for (int p = TIMP.get(l0), tcount = 0; tcount < TSIZE[l0]; p = NEXT.get(p), ++tcount) {
+                                for (int p = TIMP[l0], tcount = 0; tcount < TSIZE[l0]; p = NEXT.get(p), ++tcount) {
                                     int u0 = U.get(p);
                                     int v = V.get(p);
                                     ++TSIZE[v^1];
@@ -537,5 +540,45 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     continue;
             }
         }
+    }
+
+    public void X() {
+        final int nVariables = problem.nVariables();
+        double[] h = new double[2*nVariables+2];
+        final double alpha = 3.5;
+        final double THETA = 20.0;
+
+        for (int i = 1; i <= nVariables; ++i) {
+            h[2*i] = h[2*i+1] = 1;
+        }
+
+        int nCycles = 5;
+
+        // This is the BIMP/TIMP form.
+        System.out.printf(" h: %s\n", Arrays.toString(h));
+
+        for (int k = 0; k < nCycles; ++k) {
+            double hAve = 0.0;
+            for (int i = 1; i <= nVariables; ++i) hAve += h[2*i] + h[2*i+1];
+            hAve /= 2.0 * nVariables;
+            double[] hprime = new double[h.length];
+            for (int l = 2; l <= 2 * nVariables + 1; ++l) {
+                // update h[l]
+                double hp = 0.1;
+                // for all u in BIMP[l] with u not fixed
+                TIntArrayList bimpl = BIMP[l];
+                double hs = 0;
+                for (int j = 0; j < BSIZE[l]; ++j) hs += h[j] / hAve;
+                hp += alpha * hs;
+                for (int p = TIMP[l], j = 0; j < TSIZE[l]; p = NEXT.get(p), ++j) {
+                    hp += h[U.get(p)] * h[V.get(p)] / (hAve * hAve);
+                }
+                hprime[l] = hp > THETA ? THETA : hp;
+            }
+            System.arraycopy(hprime, 2, h, 2, 2*nVariables);
+        }
+        System.out.printf("h: %s\n", Arrays.toString(h));
+        System.out.printf("nc: %d\n", problem.nClauses());
+
     }
 }
