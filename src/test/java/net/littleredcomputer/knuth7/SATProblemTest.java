@@ -49,6 +49,7 @@ public class SATProblemTest {
 
     private static SATProblem ex6 = SATProblem.parseFrom("p cnf 4 8\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0 -4 1 -2 0");
     private static SATProblem ex7 = SATProblem.parseFrom("p cnf 4 7\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0");
+    private static SATProblem ex152 = SATProblem.parseFrom("p cnf 5 6\n1 2 -3 0 1 -2 3 0 -1 2 -3 0 -1 -2 3 0 2 4 5 0 3 -4 -5 0");
 
     private static List<Function<SATProblem, Optional<boolean[]>>> algorithms = ImmutableList.of(
             p -> new SATAlgorithmA(p).solve(),
@@ -338,4 +339,25 @@ public class SATProblemTest {
         assertThat(new SATAlgorithmL(dubois).solve().map(dubois::evaluate), isEmpty());
         assertThat(new SATAlgorithmD(dubois).solve().map(dubois::evaluate), isEmpty());
     }
+    @Test
+    public void algorithmX() {
+        SATProblem w = waerdenProblem(3, 3, 9);
+        SATAlgorithmL a = new SATAlgorithmL(w);
+        a.X();
+
+    }
+
+    @Test
+    public void algorithmX2() {
+        new SATAlgorithmL(ex152).X();
+    }
+
+    //Too hard for algorithm A or B, at least as a unit test
+
+//    @Test
+//    public void dubois20() {
+//        assertThat(SATProblem.parseFrom(new InputStreamReader(this.getClass().getClassLoader().getResourceAsStream("dubois20.cnf"))).algorithmA(),
+//                is(Optional.empty()));
+//
+//    }
 }
