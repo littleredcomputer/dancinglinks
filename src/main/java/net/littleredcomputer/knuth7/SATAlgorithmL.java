@@ -306,7 +306,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         for (int i = 1; i <= nVariables; ++i) sat[i-1] = (VAL[i] & 1) == 0;
                         return Optional.of(sat);
                     }
-                    X();
+                    // X();
                     // Go to state 15 if alg. X has discovered a conflict.
                     if (FORCE.size() == 0) {
                         log.trace("Not running algorithm X");
@@ -511,13 +511,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
      * Knuth's Algorithm X, which is used to gather information guiding the selection of literals
      * in Algorithm L.
      */
-    private void X() {
-        int N = problem.nVariables() - F;
-        // Use (65) to compute a rough score h(l) for each free literal l.
-
-
-    }
-
     public void X() {
         final int nVariables = problem.nVariables();
         final int N = nVariables - F;
