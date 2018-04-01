@@ -22,18 +22,21 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private final TIntArrayList NEXT = new TIntArrayList();
     private final TIntArrayList FORCE = new TIntArrayList();
     private final TIntArrayList[] BIMP;
-    private final int[] TIMP;
+    private final int[] TIMP;  // ternary clause implications
     private final int[] VAR;
-    private final int[] VAL;
+    private final int[] VAL;  // VAL[i] is the current contextual truth value of VAR[i]
     private final int[] DEC;
     private final int[] BACKF;
     private final int[] BACKI;
-    private final int[] INX;
+    private final int[] INX;  // INX[v] is the index of variable v in VAR
     private final int[] BRANCH;
     private final int[] TSIZE;  // TSIZE[l] is the length of the active segment of the TIMP array for literal l.
     private final int[] BSIZE;  // BSIZE[l] is the length of the active segment of the BIMP array for literal l.
     private final int[] IST;  // IST[l] is the ISTAMP value corresponding to the last extension of BIMP[l].
     private final int[] R;
+    private final int[] CAND;  // candidates for algorithm X
+    private final double[][] h;  // h[d][l] is the h-score of literal l at depth d
+    private final double[] r;    // r[x] is the "rating" of variable x in step X3
     // Reading Knuth we might choose to implement ISTACK as a stack of pairs of ints. But that would require boxing.
     // Instead, we implement ISTACK as a pair of stacks of primitive ints.
     private final TIntStack ISTACKb = new TIntArrayStack();  // stack of literals
@@ -43,6 +46,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private int F = 0;
     private int G = 0;
     private int ISTAMP = 0;
+    private int d = 0;  // current depth within search tree
 
     private enum Fixity {
         UNFIXED,
@@ -65,11 +69,19 @@ public class SATAlgorithmL extends AbstractSATSolver {
         BACKF = new int[nVariables];
         BACKI = new int[nVariables];
         INX = new int[nVariables + 1];
+        CAND = new int[nVariables];
         BRANCH = new int[nVariables];
         TSIZE = new int[2 * nVariables + 2];
         BSIZE = new int[2 * nVariables + 2];
         IST = new int[2 * nVariables + 2];
         R = new int[nVariables+1];  // stack to record the names of literals that have received values
+        h = new double[nVariables][];
+        h[0] = new double[2*nVariables+2];
+        for (int i = 1; i <= nVariables; ++i) {
+            h[0][2*i] = 1;
+            h[0][2*i+1] = 1;
+        }
+        r = new double[nVariables + 1];
 
         Set<Integer> units = new HashSet<>();
         List<Set<Integer>> oBIMP = new ArrayList<>(2 * nVariables + 2);
@@ -276,7 +288,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         start();
         // XXX consider moving tableau creation to the constructor
         final int nVariables = problem.nVariables();
-        int d = 0;
         int CONFLICT = 0;
         int N = VAR.length;
         int state = 2;
@@ -544,41 +555,118 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
     public void X() {
         final int nVariables = problem.nVariables();
-        double[] h = new double[2*nVariables+2];
+        final int N = nVariables - F;
+        double[] hd = h[d];
         final double alpha = 3.5;
         final double THETA = 20.0;
-
-        for (int i = 1; i <= nVariables; ++i) {
-            h[2*i] = h[2*i+1] = 1;
-        }
+        final int C0 = 30, C1 = 600;  // See Ex. 148
 
         int nCycles = 5;
 
         // This is the BIMP/TIMP form.
-        System.out.printf(" h: %s\n", Arrays.toString(h));
+        System.out.printf(" h[d]: %s\n", Arrays.toString(hd));
 
+        // Step X1 is performed before this routine is called.
+        // Step X2: Compile rough heuristics.
         for (int k = 0; k < nCycles; ++k) {
             double hAve = 0.0;
-            for (int i = 1; i <= nVariables; ++i) hAve += h[2*i] + h[2*i+1];
-            hAve /= 2.0 * nVariables;
-            double[] hprime = new double[h.length];
-            for (int l = 2; l <= 2 * nVariables + 1; ++l) {
-                // update h[l]
-                double hp = 0.1;
-                // for all u in BIMP[l] with u not fixed
-                TIntArrayList bimpl = BIMP[l];
-                double hs = 0;
-                for (int j = 0; j < BSIZE[l]; ++j) hs += h[j] / hAve;
-                hp += alpha * hs;
-                for (int p = TIMP[l], j = 0; j < TSIZE[l]; p = NEXT.get(p), ++j) {
-                    hp += h[U.get(p)] * h[V.get(p)] / (hAve * hAve);
+            for (int i = 1; i <= nVariables; ++i) {
+                if (INX[i] < N) {
+                    hAve += hd[2 * i] + hd[2 * i + 1];
                 }
-                hprime[l] = hp > THETA ? THETA : hp;
             }
-            System.arraycopy(hprime, 2, h, 2, 2*nVariables);
+            hAve /= 2.0 * nVariables;
+            final double hAve2 = hAve * hAve;
+            double[] hprime = new double[hd.length];
+            for (int i = 1; i <= nVariables; ++i) {
+                if (INX[i] < N) {
+                    for (int l = 2*i; l <= 2*i+1; ++l) {
+                        // update hd[l]
+                        double hp = 0.1;
+                        // for all u in BIMP[l] with u not fixed
+                        TIntArrayList bimpl = BIMP[l];
+                        double hs = 0;
+                        for (int j = 0; j < BSIZE[l]; ++j) hs += hd[bimpl.get(j)] / hAve;
+                        hp += alpha * hs;
+                        for (int p = TIMP[l], j = 0; j < TSIZE[l]; p = NEXT.get(p), ++j) {
+                            hp += hd[U.get(p)] * hd[V.get(p)] / hAve2;
+                        }
+                        hprime[l] = hp > THETA ? THETA : hp;
+                    }
+                }
+            }
+            System.arraycopy(hprime, 2, hd, 2, 2*nVariables);
         }
-        System.out.printf("h: %s\n", Arrays.toString(h));
-        System.out.printf("nc: %d\n", problem.nClauses());
+        System.out.printf(" h0: %s\n", Arrays.toString(h[0]));
+        System.out.printf(" nc: %d\n", problem.nClauses());
+        // Step X3: Preselect candidates.
+        // XXX: how many variables are "participants"?
+        int C = 0;  // for now, we don't know of any.
+
+        if (C == 0) {
+            C = N;
+            System.arraycopy(VAR, 0, CAND, 0, C);
+            // "Terminate happily, however, if all free clauses are satisfied...."
+            // From Ex. 152:
+            //  "Indeed, the absence of free participants means that the fixed-true
+            //   literals form an autarky. If TSIZE(l) is nonzero for any free literal
+            //   l, some clause is unsatisfied. Otherwise all clauses are satisfied
+            //   unless some free l has an unfixed literal lʹ ∈ BIMP(l)."
+            boolean sat = true;
+            OUTER: for (int v : CAND) {  // XXX allocates an iterator? often enough to worry about?
+                for (int l = 2*v; l <= 2*v+1; ++l) {
+                    // l is a free literal since v is a free variable.
+                    if (TSIZE[l] > 0) {
+                        sat = false;
+                        break OUTER;
+                    }
+                    TIntArrayList bimpl = BIMP[l];
+                    for (int j = 0; j < BSIZE[l]; ++j) {
+                        if (fixity(bimpl.get(j)) == Fixity.UNFIXED) {
+                            sat = false;
+                            break OUTER;
+                        }
+                    }
+                }
+            }
+            if (sat) throw new IllegalStateException("X found SAT!");
+        } else {
+            throw new IllegalStateException("Don't know how to proceed yet");
+        }
+
+        // Give each variable x in CAND the rating r(x) = h(x)h(¬x)
+        double r_sum = 0.;
+        for (int v : CAND) {
+            r[v] = hd[2*v] * hd[2*v+1];
+            r_sum += r[v];
+        }
+        double r_mean = r_sum / CAND.length;
+
+        final double C_max = d == 0 ? C1 : Integer.max(C0, C1/d);  // Eq. (66)
+
+        log.trace("mean rating %g", r_mean);
+        log.trace("C_max = %g", C_max);
+        // While C > 2 C_max, delete all elements of CAND whose rating
+        // exceeds the mean rating; but terminate the loop if no elements are
+        // actually deleted.
+
+        // Finally, if C > C_max, reduce C to C_max by retaining only top-ranked
+        // candidates.
+
+        // X4 [Nest the can didates.]
+
+        // "Construct a lookahead forest, represented in LL[j] and LO[j] for 0 ≤ j < S
+        // and by PARENT pointers (see ex. 155).
+
+        // X5 [Prepare to explore.]
+        // X6 [Choose l for lookahead.]
+        // X7 [Move to next.]
+        // X8 [Compute sharper heuristic.]
+        // X9 [Exploit an autarky.]
+        // X10 [Optionally look deeper.]
+        // X11 [Exploit unnecessary assignments.]
+        // X12 [Force l.] (this is a subroutine...)
+        // X13 [Recover from conflict.]
 
     }
 }

@@ -49,6 +49,7 @@ public class SATProblemTest {
 
     private static String ex6 = "p cnf 4 8\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0 -4 1 -2 0";
     private static String ex7 = "p cnf 4 7\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0";
+    private static SATProblem ex152 = SATProblem.parseFrom("p cnf 5 6\n1 2 -3 0 1 -2 3 0 -1 2 -3 0 -1 -2 3 0 2 4 5 0 3 -4 -5 0");
     private static List<Function<SATProblem, Optional<boolean[]>>> algorithms = ImmutableList.of(
             p -> new SATAlgorithmA(p).solve(),
             p -> new SATAlgorithmB(p).solve(),
@@ -337,6 +338,11 @@ public class SATProblemTest {
         SATAlgorithmL a = new SATAlgorithmL(w);
         a.X();
 
+    }
+
+    @Test
+    public void algorithmX2() {
+        new SATAlgorithmL(ex152).X();
     }
 
     //Too hard for algorithm A or B, at least as a unit test
