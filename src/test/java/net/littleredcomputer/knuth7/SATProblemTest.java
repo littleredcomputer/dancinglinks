@@ -72,14 +72,30 @@ public class SATProblemTest {
         return SATProblem.parseFrom(new InputStreamReader(this.getClass().getClassLoader().getResourceAsStream(name)));
     }
 
+    private SATProblem knuthFromResource(String name) {
+        return SATProblem.parseKnuth(new InputStreamReader(this.getClass().getClassLoader().getResourceAsStream(name)));
+    }
+
     private final SATProblem zebra = fromResource("zebra.cnf");
     private final SATProblem quinn = fromResource("quinn.cnf");
     private final SATProblem dubois = fromResource("dubois20.cnf");
+    private final SATProblem queen5 = knuthFromResource("queen-5x5-5.sat");
+    private final SATProblem mutex4bitsL1 = knuthFromResource("mutex-fourbits-lemmas-1.sat");
 
     private String toBinaryString(boolean[] bs) {
         StringBuilder s = new StringBuilder();
         for (boolean b : bs) s.append(b ? '1' : '0');
         return s.toString();
+    }
+
+    @Test
+    public void queen5() {
+        algorithms.forEach(a -> assertThat(a.apply(queen5).map(queen5::evaluate), isPresentAndIs(true)));
+    }
+
+    @Test
+    public void mutex4bitsL1() {
+        algorithms.forEach(a -> assertThat(a.apply(mutex4bitsL1), isEmpty()));
     }
 
     @Test
@@ -308,7 +324,8 @@ public class SATProblemTest {
         qsol.ifPresent(bs -> assertThat(countTrueBits(bs), is(greaterThan(0))));
     }
 
-    @Test public void threeSatTest() {
+    @Test
+    public void threeSatTest() {
         IntStream.range(4, 8).forEach(this::threeSat);
     }
 

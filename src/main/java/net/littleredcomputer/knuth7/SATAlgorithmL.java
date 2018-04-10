@@ -611,6 +611,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
         // Finally, if C > C_max, reduce C to C_max by retaining only top-ranked
         // candidates.
 
+
+
         // X4 [Nest the can didates.]
 
         // "Construct a lookahead forest, represented in LL[j] and LO[j] for 0 ≤ j < S

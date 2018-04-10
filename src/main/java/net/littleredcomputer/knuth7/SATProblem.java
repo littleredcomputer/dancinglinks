@@ -1,18 +1,22 @@
 package net.littleredcomputer.knuth7;
 
-import com.google.common.collect.ImmutableList;
+import com.google.common.base.Splitter;
 
-import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.io.BufferedReader;
+import java.io.Reader;
+import java.io.StreamTokenizer;
+import java.io.StringReader;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 public class SATProblem {
-    private static Pattern pLineRe = Pattern.compile("p\\s+cnf\\s+([0-9]+)\\s+([0-9]+)\\s*");
+    private final static Pattern pLineRe = Pattern.compile("p\\s+cnf\\s+([0-9]+)\\s+([0-9]+)\\s*");
+    private final static Splitter splitter = Splitter.on(' ').trimResults().omitEmptyStrings();
     private final int nVariables; // XXX do we care?
-    private final List<ImmutableList<Integer>> clauses = new ArrayList<>();
+    private final List<List<Integer>> clauses = new ArrayList<>();
     private int nLiterals = 0;
     private int height = 0;
 
@@ -21,16 +25,30 @@ public class SATProblem {
         this.nVariables = nVariables;
     }
 
-    public int nClauses() { return clauses.size(); }
-    public int nVariables() { return nVariables; }
-    public int nLiterals() { return nLiterals; }
-    public int height() { return height; }
-    ImmutableList<Integer> getClause(int i) { return clauses.get(i); }
+    public int nClauses() {
+        return clauses.size();
+    }
 
-    private static StreamTokenizer tokenizer(Reader r) {
+    public int nVariables() {
+        return nVariables;
+    }
+
+    public int nLiterals() {
+        return nLiterals;
+    }
+
+    public int height() {
+        return height;
+    }
+
+    List<Integer> getClause(int i) {
+        return clauses.get(i);
+    }
+
+    private static StreamTokenizer knuthTokenizer(Reader r) {
         StreamTokenizer t = new StreamTokenizer(r);
         t.resetSyntax();
-        t.parseNumbers();
+        t.eolIsSignificant(true);
         t.whitespaceChars(0, ' ');
         return t;
     }
@@ -44,19 +62,21 @@ public class SATProblem {
     private static int encodeLiteral(int variable) {
         return variable > 0 ? 2 * variable : -2 * variable + 1;
     }
+
     static int decodeLiteral(int literal) {
         int sign = ((literal & 1) == 0) ? 1 : -1;
         return sign * (literal >> 1);
     }
 
-    private void addClause(List<Integer> literals) {
-        ImmutableList<Integer> ls = literals.stream().map(SATProblem::encodeLiteral).collect(ImmutableList.toImmutableList());
-        clauses.add(ls);
-        nLiterals += ls.size();
-        if (ls.size() > height) height = ls.size();
+    private void addClause(Iterable<Integer> literals) {
+        List<Integer> clause = StreamSupport.stream(literals.spliterator(), false).map(SATProblem::encodeLiteral).collect(Collectors.collectingAndThen(Collectors.toList(), Collections::unmodifiableList));
+        final int s = clause.size();
+        nLiterals += s;
+        clauses.add(clause);
+        if (s > height) height = s;
     }
 
-    private void addEncodedClause(ImmutableList<Integer> encodedLiterals) {
+    private void addEncodedClause(List<Integer> encodedLiterals) {
         clauses.add(encodedLiterals);
         nLiterals += encodedLiterals.size();
         if (encodedLiterals.size() > height) height = encodedLiterals.size();
@@ -65,16 +85,17 @@ public class SATProblem {
     Optional<boolean[]> solutionFromSteps(int[] steps) {
         // Success: convert the move notation into a satisfying assignment.
         boolean[] solution = new boolean[nVariables];
-        for (int i = 1; i < steps.length; ++i) solution[i-1] = (steps[i] & 1) == 0;
+        for (int i = 1; i < steps.length; ++i) solution[i - 1] = (steps[i] & 1) == 0;
         return Optional.of(solution);
     }
 
     public boolean evaluate(boolean[] solution) {
-        CLAUSE: for (int i = 1; i < clauses.size(); ++i) {
+        CLAUSE:
+        for (int i = 1; i < clauses.size(); ++i) {
             List<Integer> clause = clauses.get(i);
             for (int literal : clause) {
                 // One true literal in the clause is enough to make the whole clause true.
-                if (solution[(literal>>1) - 1] == ((literal & 1) == 0)) continue CLAUSE;
+                if (solution[(literal >> 1) - 1] == ((literal & 1) == 0)) continue CLAUSE;
             }
             return false;  // Any false clause is enough to spoil satisfaction.
         }
@@ -86,72 +107,85 @@ public class SATProblem {
     }
 
     public static SATProblem parseFrom(Reader r) {
-        BufferedReader br = new BufferedReader(r);
-        int nVar;
-        int nClause;
-        SATProblem sat;
-        try {
-            while (true) {
-                String line = br.readLine();
-                if (line.startsWith("c")) continue;
-                if (line.startsWith("p")) {
-                    Matcher m = pLineRe.matcher(line);
-                    if (!m.matches()) throw new IllegalArgumentException("invalid p line");
-                    nVar = Integer.parseInt(m.group(1));
-                    nClause = Integer.parseInt(m.group(2));
-                    break;
-                }
-                throw new IllegalArgumentException("Invalid dimacs preamble");
-            }
-            sat = new SATProblem(nVar);
-            StreamTokenizer tk = tokenizer(br);
-            int token;
-            List<Integer> literals = new ArrayList<>();
-            while ((token = tk.nextToken()) != StreamTokenizer.TT_EOF) {
-                if (token != StreamTokenizer.TT_NUMBER) throw new IllegalArgumentException("Illegal literal: " + token);
-                int l = (int) tk.nval;
-                if (l > nVar || l < -nVar)
-                    throw new IllegalArgumentException("Literal out of bounds established by p cnf: " + l);
+        List<Integer> literals = new ArrayList<>();
+        Iterator<String> ls = new BufferedReader(r).lines().filter(s -> !s.startsWith("c")).iterator();
+        if (!ls.hasNext()) throw new IllegalArgumentException("Missing SAT instance data");
+        Matcher m = pLineRe.matcher(ls.next());
+        if (!m.matches()) throw new IllegalArgumentException("invalid p line");
+        int nVar = Integer.parseInt(m.group(1));
+        int nClause = Integer.parseInt(m.group(2));
+        SATProblem p = new SATProblem(nVar);
+        ls.forEachRemaining(line -> {
+            StreamSupport.stream(splitter.split(line).spliterator(), false).mapToInt(Integer::parseInt).forEach(l -> {
                 if (l == 0) {
                     if (literals.isEmpty())
-                        throw new IllegalArgumentException("Empty clause (therefore problem is trivially unsatisfiable): " + tk + "," + tk.nval + "," + tk.sval);
-                    if (sat.nClauses() >= nClause)
-                        throw new IllegalArgumentException("More clauses specified than allowed for in p statement");
-                    sat.addClause(literals);
+                        throw new IllegalArgumentException("Empty clause, so problem is trivially unsatisfiable");
+                    p.addClause(literals);
                     literals.clear();
-                    continue;
+                } else {
+                    if (l > nVar || l < -nVar) throw new IllegalArgumentException("literal out of declared bounds");
+                    literals.add(l);
                 }
-                literals.add(l);
-            }
-            if (!literals.isEmpty()) throw new IllegalArgumentException("dangling final clause lacks zero-termination");
-        } catch (IOException e) {
-            throw new IllegalArgumentException("Parse error", e);
+            });
+        });
+        if (!literals.isEmpty()) throw new IllegalArgumentException("Unterminated final clause");
+        if (p.nClauses() != nClause) {
+            throw new IllegalArgumentException("Observed clause count disagrees with DIMACS p header");
         }
-        return sat;
+        return p;
+    }
+
+    public static SATProblem parseKnuth(String s) {
+        return parseKnuth(new StringReader(s));
+    }
+
+    public static SATProblem parseKnuth(Reader r) {
+        List<Integer> literals = new ArrayList<>();
+        HashMap<String, Integer> varMap = new HashMap<>();
+        List<List<Integer>> clauses = new ArrayList<>();
+        new BufferedReader(r).lines()
+                .filter(s -> !s.startsWith("~ "))
+                .forEach(line -> {
+                    List<Integer> clause = new ArrayList<>();
+                    for (String lit : splitter.split(line)) {
+                        boolean negated = false;
+                        if (lit.startsWith("~")) {
+                            negated = true;
+                            lit = lit.substring(1);
+                        }
+                        if (!varMap.containsKey(lit)) {
+                            varMap.put(lit, varMap.size() + 1);
+                        }
+                        clause.add(varMap.get(lit) * (negated ? -1 : 1));
+                    }
+                    clauses.add(clause);
+                });
+        SATProblem p = new SATProblem(varMap.size() + 1);
+        clauses.forEach(p::addClause);
+        return p;
     }
 
     public SATProblem to3SAT() {
         if (this.height <= 3) return this;
-        List<ImmutableList<Integer>> newClauses = new ArrayList<>();
+        List<List<Integer>> newClauses = new ArrayList<>();
         int nextVariable = nVariables + 1;
-        for (ImmutableList<Integer> c : clauses) {
+        for (List<Integer> c : clauses) {
             if (c.size() <= 3) {
                 newClauses.add(c);
             } else {
-                // ImmutableList.Builder<Integer> b = new ImmutableList.Builder<>();
                 // Add the leftmost part
                 final int N = c.size();
-                newClauses.add(ImmutableList.of(c.get(0), c.get(1), encodeLiteral(nextVariable)));
+                newClauses.add(Collections.unmodifiableList(Arrays.asList(c.get(0), c.get(1), encodeLiteral(nextVariable))));
                 // Add the middle parts
                 for (int j = 2; j < N - 2; ++j, ++nextVariable) {
-                    newClauses.add(ImmutableList.of(c.get(j), encodeLiteral(-nextVariable), encodeLiteral(nextVariable+1)));
+                    newClauses.add(Collections.unmodifiableList(Arrays.asList(c.get(j), encodeLiteral(-nextVariable), encodeLiteral(nextVariable + 1))));
                 }
                 // Add the last clause
-                newClauses.add(ImmutableList.of(encodeLiteral(-nextVariable), c.get(N - 2), c.get(N - 1)));
+                newClauses.add(Collections.unmodifiableList(Arrays.asList(encodeLiteral(-nextVariable), c.get(N - 2), c.get(N - 1))));
                 ++nextVariable;
             }
         }
-        SATProblem q = new SATProblem(nextVariable-1);
+        SATProblem q = new SATProblem(nextVariable - 1);
         newClauses.forEach(q::addEncodedClause);
         return q;
     }
