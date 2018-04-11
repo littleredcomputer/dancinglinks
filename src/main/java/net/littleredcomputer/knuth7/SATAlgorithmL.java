@@ -87,7 +87,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         List<Set<Integer>> oBIMP = new ArrayList<>(2 * nVariables + 2);
         for (int i = 0; i < 2 * nVariables + 2; ++i) oBIMP.add(new HashSet<>());
         for (int i = 0; i < problem.nClauses(); ++i) {
-            List<Integer> clause = problem.getClause(i);
+            List<Integer> clause = problem.getEncodedClause(i);
             switch (clause.size()) {
                 case 1: {
                     // Put it in the FORCE array, unless it is contradictory
@@ -571,18 +571,19 @@ public class SATAlgorithmL extends AbstractSATSolver {
             //   l, some clause is unsatisfied. Otherwise all clauses are satisfied
             //   unless some free l has an unfixed literal lʹ ∈ BIMP(l)."
             boolean sat = true;
-            OUTER: for (int v : CAND) {  // XXX allocates an iterator? often enough to worry about?
+            VARIABLE: for (int i = 0; i < C; ++i) {
+                final int v = CAND[i];
                 for (int l = 2*v; l <= 2*v+1; ++l) {
                     // l is a free literal since v is a free variable.
                     if (TSIZE[l] > 0) {
                         sat = false;
-                        break OUTER;
+                        break VARIABLE;
                     }
                     TIntArrayList bimpl = BIMP[l];
                     for (int j = 0; j < BSIZE[l]; ++j) {
                         if (fixity(bimpl.get(j)) == Fixity.UNFIXED) {
                             sat = false;
-                            break OUTER;
+                            break VARIABLE;
                         }
                     }
                 }
@@ -594,22 +595,51 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
         // Give each variable x in CAND the rating r(x) = h(x)h(¬x)
         double r_sum = 0.;
-        for (int v : CAND) {
+        for (int i = 0; i < C; ++i) {
+            final int v = CAND[i];
             r[v] = hd[2*v] * hd[2*v+1];
             r_sum += r[v];
         }
-        double r_mean = r_sum / CAND.length;
 
         final double C_max = d == 0 ? C1 : Integer.max(C0, C1/d);  // Eq. (66)
 
-        log.trace("mean rating %g", r_mean);
         log.trace("C_max = %g", C_max);
+
         // While C > 2 C_max, delete all elements of CAND whose rating
-        // exceeds the mean rating; but terminate the loop if no elements are
+        // is less than the mean rating; but terminate the loop if no elements are
         // actually deleted.
+
+        while (C > 2 * C_max) {
+            // Compute the mean score.
+            double r_mean = r_sum / C;
+            boolean deletions = false;
+            r_sum = 0.0;
+            for (int i = 0; i < C; ) {
+                if (r[CAND[i]] < r_mean) {
+                    // This is a bad one. Pull a new one from the end of the candidates list.
+                    --C;
+                    CAND[i] = CAND[C-1];
+                    deletions = true;
+                } else {
+                    // This is a good one. Keep it, accumulate its score, and go to the next.
+                    r_sum += r[CAND[i]];
+                    ++i;
+                }
+            }
+            if (!deletions) break;
+        }
 
         // Finally, if C > C_max, reduce C to C_max by retaining only top-ranked
         // candidates.
+
+        // This would be more efficiently done as a heap. XXX
+
+        if (C > C_max) {
+            //Arrays.sort
+
+        }
+
+
 
 
 

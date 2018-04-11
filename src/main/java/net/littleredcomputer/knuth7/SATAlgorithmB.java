@@ -21,7 +21,7 @@ public class SATAlgorithmB extends AbstractSATSolver {
 
         int c = 0;
         for (int ciz = nClauses - 1; ciz >= 0; --ciz) {
-            List<Integer> clause = problem.getClause(ciz);
+            List<Integer> clause = problem.getEncodedClause(ciz);
             START[ciz+1] = c;
             LINK[ciz+1] = W[clause.get(0)];
             W[clause.get(0)] = ciz+1;

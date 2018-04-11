@@ -32,7 +32,7 @@ public class SATAlgorithmA extends AbstractSATSolver {
         // Process clauses in reverse order, and literals in descending order of variable (because Knuth does).
         // c is the index of the next free slot in the (L, F, B, C) arrays. ciz is the zero-based clause index.
         for (int ciz = nClauses - 1; ciz >= 0; --ciz) {
-            List<Integer> clause = Lists.newArrayList(problem.getClause(ciz));
+            List<Integer> clause = Lists.newArrayList(problem.getEncodedClause(ciz));
             Collections.sort(clause);
             START[ciz + 1] = c;
             SIZE[ciz + 1] = clause.size();

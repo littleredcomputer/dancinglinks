@@ -17,6 +17,7 @@ import java.util.stream.Stream;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.*;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.number.OrderingComparison.greaterThan;
 import static org.junit.Assert.assertThat;
 
@@ -45,6 +46,19 @@ public class SATProblemTest {
     @Test(expected = IllegalArgumentException.class)
     public void danglingClause() {
         SATProblem.parseFrom(new StringReader("c unclosed clause\np cnf 3 2\n1 2 3 0\n2 3 -1 0\n-2 -3"));
+    }
+
+    @Test
+    public void randomInstanceTest() {
+        // To test the random instance generation, we verify that our results agree with
+        // Knuth's example rand-3-1061-250-314159.sat (except our variables are 1-based,
+        // and his are 0-based)
+        SATProblem r = SATProblem.randomInstance(3, 1061, 250, 314159);
+        assertThat(r.height(), is(3));
+        assertThat(r.nClauses(), is(1061));
+        assertThat(r.nVariables(), is(250));
+        assertThat(r.getClause(0), contains(-165, 123, 90));
+        assertThat(r.getClause(1060), contains(172, 93, 30));
     }
 
     private static SATProblem ex6 = SATProblem.parseFrom("p cnf 4 8\n1 2 -3 0 2 3 -4 0 3 4 1 0 4 -1 2 0 -1 -2 3 0 -2 -3 4 0 -3 -4 -1 0 -4 1 -2 0");
@@ -81,12 +95,32 @@ public class SATProblemTest {
     private final SATProblem dubois = fromResource("dubois20.cnf");
     private final SATProblem queen5 = knuthFromResource("queen-5x5-5.sat");
     private final SATProblem mutex4bitsL1 = knuthFromResource("mutex-fourbits-lemmas-1.sat");
+    private final SATProblem rand3_1061 = knuthFromResource("rand-3-1061-250-314159.sat");
+    private final SATProblem rand3_1062 = knuthFromResource("rand-3-1062-250-314159.sat");
+    private final SATProblem rand3_420_100_0 = SATProblem.randomInstance(3, 420, 100, 0);
 
-    private String toBinaryString(boolean[] bs) {
+    private static String toBinaryString(boolean[] bs) {
         StringBuilder s = new StringBuilder();
         for (boolean b : bs) s.append(b ? '1' : '0');
         return s.toString();
     }
+
+    @Test
+    public void setRand3_420_100_0_L() {
+        assertThat(new SATAlgorithmL(rand3_420_100_0).solve(), isEmpty());
+    }
+
+    @Test
+    public void setRand3_420_100_0_D() {
+        assertThat(new SATAlgorithmD(rand3_420_100_0).solve(), isEmpty());
+    }
+
+
+// currently L takes almost 4 hours to do this (at this writing, we don't have X
+//    @Test
+//    public void rand3_1061_L() {
+//        assertThat(new SATAlgorithmL(rand3_1061).solve().map(rand3_1061::evaluate), isPresentAndIs(true));
+//    }
 
     @Test
     public void queen5() {
@@ -304,7 +338,7 @@ public class SATProblemTest {
         SATProblem p = langfordProblem(4).to3SAT();
         Optional<boolean[]> sol = new SATAlgorithmD(p).solve();
         assertThat(sol.map(p::evaluate), isPresentAndIs(true));
-        assertThat(sol.map(this::toBinaryString), isPresentAndIs("000010100000100001111000011110001101"));
+        assertThat(sol.map(SATProblemTest::toBinaryString), isPresentAndIs("000010100000100001111000011110001101"));
     }
 
     private void threeSat(int n) {
@@ -368,13 +402,4 @@ public class SATProblemTest {
     public void algorithmX2() {
         new SATAlgorithmL(ex152).X();
     }
-
-    //Too hard for algorithm A or B, at least as a unit test
-
-//    @Test
-//    public void dubois20() {
-//        assertThat(SATProblem.parseFrom(new InputStreamReader(this.getClass().getClassLoader().getResourceAsStream("dubois20.cnf"))).algorithmA(),
-//                is(Optional.empty()));
-//
-//    }
 }

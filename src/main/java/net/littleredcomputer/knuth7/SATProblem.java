@@ -4,13 +4,14 @@ import com.google.common.base.Splitter;
 
 import java.io.BufferedReader;
 import java.io.Reader;
-import java.io.StreamTokenizer;
 import java.io.StringReader;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+
+import static java.util.stream.Collectors.toList;
 
 public class SATProblem {
     private final static Pattern pLineRe = Pattern.compile("p\\s+cnf\\s+([0-9]+)\\s+([0-9]+)\\s*");
@@ -41,23 +42,19 @@ public class SATProblem {
         return height;
     }
 
-    List<Integer> getClause(int i) {
+    List<Integer> getEncodedClause(int i) {
         return clauses.get(i);
     }
 
-    private static StreamTokenizer knuthTokenizer(Reader r) {
-        StreamTokenizer t = new StreamTokenizer(r);
-        t.resetSyntax();
-        t.eolIsSignificant(true);
-        t.whitespaceChars(0, ' ');
-        return t;
+    List<Integer> getClause(int i) {
+        return clauses.get(i).stream().map(SATProblem::decodeLiteral).collect(toList());
     }
 
     /**
      * Implement the encoding described in 7.2.2.2 (57)
      *
      * @param variable A positive or negative variable number
-     * @return The [2n|2n+1]-encoded valude
+     * @return The [2n|2n+1]-encoded value
      */
     private static int encodeLiteral(int variable) {
         return variable > 0 ? 2 * variable : -2 * variable + 1;
@@ -69,7 +66,7 @@ public class SATProblem {
     }
 
     private void addClause(Iterable<Integer> literals) {
-        List<Integer> clause = StreamSupport.stream(literals.spliterator(), false).map(SATProblem::encodeLiteral).collect(Collectors.collectingAndThen(Collectors.toList(), Collections::unmodifiableList));
+        List<Integer> clause = StreamSupport.stream(literals.spliterator(), false).map(SATProblem::encodeLiteral).collect(Collectors.collectingAndThen(toList(), Collections::unmodifiableList));
         final int s = clause.size();
         nLiterals += s;
         clauses.add(clause);
@@ -115,19 +112,19 @@ public class SATProblem {
         int nVar = Integer.parseInt(m.group(1));
         int nClause = Integer.parseInt(m.group(2));
         SATProblem p = new SATProblem(nVar);
-        ls.forEachRemaining(line -> {
-            StreamSupport.stream(splitter.split(line).spliterator(), false).mapToInt(Integer::parseInt).forEach(l -> {
-                if (l == 0) {
-                    if (literals.isEmpty())
-                        throw new IllegalArgumentException("Empty clause, so problem is trivially unsatisfiable");
-                    p.addClause(literals);
-                    literals.clear();
-                } else {
-                    if (l > nVar || l < -nVar) throw new IllegalArgumentException("literal out of declared bounds");
-                    literals.add(l);
-                }
-            });
-        });
+        ls.forEachRemaining(line -> StreamSupport.stream(splitter.split(line).spliterator(), false)
+                .mapToInt(Integer::parseInt)
+                .forEach(l -> {
+                    if (l == 0) {
+                        if (literals.isEmpty())
+                            throw new IllegalArgumentException("Empty clause, so problem is trivially unsatisfiable");
+                        p.addClause(literals);
+                        literals.clear();
+                    } else {
+                        if (l > nVar || l < -nVar) throw new IllegalArgumentException("literal out of declared bounds");
+                        literals.add(l);
+                    }
+                }));
         if (!literals.isEmpty()) throw new IllegalArgumentException("Unterminated final clause");
         if (p.nClauses() != nClause) {
             throw new IllegalArgumentException("Observed clause count disagrees with DIMACS p header");
@@ -135,12 +132,7 @@ public class SATProblem {
         return p;
     }
 
-    public static SATProblem parseKnuth(String s) {
-        return parseKnuth(new StringReader(s));
-    }
-
     public static SATProblem parseKnuth(Reader r) {
-        List<Integer> literals = new ArrayList<>();
         HashMap<String, Integer> varMap = new HashMap<>();
         List<List<Integer>> clauses = new ArrayList<>();
         new BufferedReader(r).lines()
@@ -188,5 +180,44 @@ public class SATProblem {
         SATProblem q = new SATProblem(nextVariable - 1);
         newClauses.forEach(q::addEncodedClause);
         return q;
+    }
+
+    /**
+     * Generate a random instance of SAT in precisely the way Knuth does in Fascicle 6.
+     * This fidelity is achieved by using the same random number generator.
+     * <p>
+     * A wrinkle: Knuth's generator uses the variables [0,n) and writes to a file. When
+     * read, Knuth's reader would select 1-based variables. To avoid the intermediate
+     * representation, we just use 1-based variables to start with.
+     *
+     * @param k    size of each clause
+     * @param m    number of clauses
+     * @param n    number of variables
+     * @param seed for random number generator
+     * @return random SAT instance
+     */
+    public static SATProblem randomInstance(int k, int m, int n, int seed) {
+        if (k <= 0) throw new IllegalArgumentException("k must be positive!");
+        if (m <= 0) throw new IllegalArgumentException("m must be positive!");
+        if (n <= 0 || n > 100000000) throw new IllegalArgumentException("n must be between 1 and 99999999");
+        if (k > n) throw new IllegalArgumentException("k mustn't exceed n!");
+        final SGBRandom R = new SGBRandom(seed);
+        SATProblem p = new SATProblem(n);
+        int i, ii, t;
+        for (int j = 0; j < m; j++) {
+            // Generate the jth clause.
+            List<Integer> encodedClause = new ArrayList<>(k);
+            for (int kk = k, nn = n; kk != 0; kk--, nn = ii) {
+                // Set ii to the largest in a random kk out of nn
+                for (ii = i = 0; i < kk; i++) {
+                    t = i + R.unifRand(nn - i);
+                    if (t > ii) ii = t;
+                }
+                // Bump ii before encoding (see above)
+                encodedClause.add(2 * (ii + 1) + (R.nextRand() & 1));
+            }
+            p.addEncodedClause(Collections.unmodifiableList(encodedClause));
+        }
+        return p;
     }
 }
