@@ -16,7 +16,7 @@ import static java.util.stream.Collectors.toList;
 public class SATProblem {
     private final static Pattern pLineRe = Pattern.compile("p\\s+cnf\\s+([0-9]+)\\s+([0-9]+)\\s*");
     private final static Splitter splitter = Splitter.on(' ').trimResults().omitEmptyStrings();
-    private final int nVariables; // XXX do we care?
+    private final int nVariables;
     private final List<List<Integer>> clauses = new ArrayList<>();
     private int nLiterals = 0;
     private int height = 0;
@@ -184,11 +184,13 @@ public class SATProblem {
 
     /**
      * Generate a random instance of SAT in precisely the way Knuth does in Fascicle 6.
-     * This fidelity is achieved by using the same random number generator.
+     * This fidelity is achieved by using the same random number generator and the clause
+     * generation technique found in sat-rand-rep.w.
      * <p>
      * A wrinkle: Knuth's generator uses the variables [0,n) and writes to a file. When
-     * read, Knuth's reader would select 1-based variables. To avoid the intermediate
-     * representation, we just use 1-based variables to start with.
+     * read, Knuth's input code would then choose 1-based variables. To avoid the intermediate
+     * representation, we just use 1-based variables to start with. While all our variables
+     * are "off by one" when compared to Knuth's, the problems they represent are equivalent.
      *
      * @param k    size of each clause
      * @param m    number of clauses

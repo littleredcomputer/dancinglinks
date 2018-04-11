@@ -5,10 +5,7 @@ import org.junit.Test;
 
 import java.io.InputStreamReader;
 import java.io.StringReader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -16,6 +13,8 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.*;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.number.OrderingComparison.greaterThan;
@@ -311,13 +310,13 @@ public class SATProblemTest {
         // The langford problem is solvable iff i mod 4 in {0, 3}. When it is solvable, we should expect the
         // number of true variables to be equal to the problem size (i.e., each digit receives exactly one
         // (dual) placement). When i mod 4 in {1, 2}, the solver should refute the problem instance.
-        List<Optional<Integer>> expected = range.get().mapToObj(i -> i % 4 == 0 || i % 4 == 3 ? Optional.of(i) : Optional.<Integer>empty()).collect(Collectors.toList());
+        List<Optional<Integer>> expected = range.get().mapToObj(i -> i % 4 == 0 || i % 4 == 3 ? Optional.of(i) : Optional.<Integer>empty()).collect(toList());
         algorithms.forEach(a -> {
             Stream<Optional<Integer>> observed = range.get().mapToObj(i -> {
                 SATProblem Li = langfordProblem(i);
                 return a.apply(Li).map(k -> Arrays.copyOfRange(k, 0, Li.nVariables())).map(this::countTrueBits);
             });
-            assertThat(observed.collect(Collectors.toList()), is(expected));
+            assertThat(observed.collect(toList()), is(expected));
         });
     }
 
@@ -401,5 +400,18 @@ public class SATProblemTest {
     @Test
     public void algorithmX2() {
         new SATAlgorithmL(ex152).X();
+    }
+
+    @Test
+    public void smallRandomTestAgreement() {
+        for (int seed = 0; seed < 100; ++seed) {
+            SATProblem p = SATProblem.randomInstance(3, 42, 10, seed);
+            // Partition the results of the various algorithms into equivalence classes. There can be only one.
+            // We confess, however, that we are only testing that all the algorithms agree on the satisfiability
+            // of the random problems and not the satisfying assignments themselves (of which there may be more
+            // than one for satisfiable instances: different algorithms may find different variable assignments).
+            assertThat(algorithms.stream().map(a -> a.apply(p).map(p::evaluate))
+                    .collect(Collectors.collectingAndThen(toSet(), Set::size)), is(1));
+        }
     }
 }
