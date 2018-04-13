@@ -389,6 +389,7 @@ public class SATProblemTest {
         assertThat(new SATAlgorithmL(dubois).solve().map(dubois::evaluate), isEmpty());
         assertThat(new SATAlgorithmD(dubois).solve().map(dubois::evaluate), isEmpty());
     }
+
     @Test
     public void algorithmX() {
         SATProblem w = waerdenProblem(3, 3, 9);

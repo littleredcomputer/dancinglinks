@@ -3,7 +3,7 @@ package net.littleredcomputer.knuth7;
 import com.google.common.primitives.UnsignedInts;
 
 /**
- * The random number generator from the Stanford GraphBase
+ * The random number generator from the Stanford GraphBase (gb_flip.w)
  */
 public class SGBRandom {
     private static final int two_to_the_31 = 0x80000000;
@@ -14,7 +14,7 @@ public class SGBRandom {
     private int mod_diff(int x, int y) { return (x-y) & 0x7fffffff; }
 
     /**
-     *  A random number generator bit-compatible with that provided by gb_flip.h in the
+     *  A random number generator bit-compatible with that provided by gb_flip.w in the
      *  Stanford GraphBase.
      *  @param seed used to initialize the RNG. The seed gives predictable results; there
      *              is no other influence on the random numbers produced.

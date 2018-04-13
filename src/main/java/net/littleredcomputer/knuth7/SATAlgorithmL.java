@@ -40,7 +40,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     // Reading Knuth we might choose to implement ISTACK as a stack of pairs of ints. But that would require boxing.
     // Instead, we implement ISTACK as a pair of stacks of primitive ints.
     private final TIntStack ISTACKb = new TIntArrayStack();  // stack of literals
-    private final TIntStack ISTACKs = new TIntArrayStack();  // stack of BIMP table size for corresponding literal above
+    private final TIntStack ISTACKs = new TIntArrayStack();  // stack of BIMP table sizes for corresponding literals above
     private int T = NT;  // truth degree (F6 7.2.2.2 p. 37)
     private int E = 0;  // literals R[k] are "nearly true" for G <= k < E.
     private int F = 0;
@@ -329,16 +329,9 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     BRANCH[d] = 0;
                 }
                 case 4:  // Try l.
-
-                    if (log.isTraceEnabled()) print();
-                    if (log.isTraceEnabled()) log.trace("d=%d: Trying %d", d, dl(l));
-                    // u = 1;            // FIXME: is u just the size of the FORCE array? Can we eliminate that variable?
-                    // FORCE.add(l);
-                    // Not quite! we can get here from step 14 which can be a consequence of CONFLICT in step 5 via step 11. So,
-                    // while we can still get rid of u, we need to clear this array here.
+                    if (log.isTraceEnabled()) { print(); log.trace("d=%d: Trying %d", d, dl(l)); }
                     FORCE.resetQuick();
                     FORCE.add(l);
-                    // FORCE.set(0, l);  // FIXME: Can this step be folded into step 3, and the scope of l thereby reduced?
                 case 5:  // Accept near truths.
                     log.trace("Accepting near-truths");
                     T = NT;
@@ -617,8 +610,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
             for (int i = 0; i < C; ) {
                 if (r[CAND[i]] < r_mean) {
                     // This is a bad one. Pull a new one from the end of the candidates list.
-                    --C;
-                    CAND[i] = CAND[C-1];
+                    CAND[i] = CAND[--C];
                     deletions = true;
                 } else {
                     // This is a good one. Keep it, accumulate its score, and go to the next.
@@ -628,22 +620,19 @@ public class SATAlgorithmL extends AbstractSATSolver {
             }
             if (!deletions) break;
         }
-
         // Finally, if C > C_max, reduce C to C_max by retaining only top-ranked
         // candidates.
-
-        // This would be more efficiently done as a heap. XXX
-
         if (C > C_max) {
-            //Arrays.sort
-
+            // Here's an allocation. Maybe we want to put heapification under
+            // user control. Can we also close over r[] that way... XXX
+            IntHeap h = new IntHeap(CAND, C, (v,w) -> Double.compare(r[w], r[v]));
+            while (C > C_max) {
+                h.get();
+                --C;
+            }
         }
 
-
-
-
-
-        // X4 [Nest the can didates.]
+        // X4 [Nest the candidates.]
 
         // "Construct a lookahead forest, represented in LL[j] and LO[j] for 0 ≤ j < S
         // and by PARENT pointers (see ex. 155).
@@ -657,6 +646,5 @@ public class SATAlgorithmL extends AbstractSATSolver {
         // X11 [Exploit unnecessary assignments.]
         // X12 [Force l.] (this is a subroutine...)
         // X13 [Recover from conflict.]
-
     }
 }
