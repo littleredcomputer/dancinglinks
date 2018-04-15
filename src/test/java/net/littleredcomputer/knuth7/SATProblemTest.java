@@ -394,8 +394,8 @@ public class SATProblemTest {
     public void algorithmX() {
         SATProblem w = waerdenProblem(3, 3, 9);
         SATAlgorithmL a = new SATAlgorithmL(w);
-        a.X();
-
+        a.useX = true;
+        a.solve();
     }
 
     @Test

@@ -47,6 +47,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private int G = 0;
     private int ISTAMP = 0;
     private int d = 0;  // current depth within search tree
+    boolean useX = false;  // whether to use algorithm X for lookahead
 
     private enum Fixity {
         UNFIXED,
@@ -76,11 +77,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         IST = new int[2 * nVariables + 2];
         R = new int[nVariables+1];  // stack to record the names of literals that have received values
         h = new double[nVariables][];
-        h[0] = new double[2*nVariables+2];
-        for (int i = 1; i <= nVariables; ++i) {
-            h[0][2*i] = 1;
-            h[0][2*i+1] = 1;
-        }
         r = new double[nVariables + 1];
 
         Set<Integer> units = new HashSet<>();
@@ -306,7 +302,9 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         for (int i = 1; i <= nVariables; ++i) sat[i-1] = (VAL[i] & 1) == 0;
                         return Optional.of(sat);
                     }
-                    // X();
+                    if (useX) {
+                        X();
+                    }
                     // Go to state 15 if alg. X has discovered a conflict.
                     if (FORCE.size() == 0) {
                         log.trace("Not running algorithm X");
@@ -512,6 +510,14 @@ public class SATAlgorithmL extends AbstractSATSolver {
         final double THETA = 20.0;
         final int C0 = 30, C1 = 600;  // See Ex. 148
 
+        if (hd == null) {
+            h[d] = hd = new double[2*nVariables+2];
+            for (int i = 1; i <= nVariables; ++i) {
+                hd[2*i] = 1;
+                hd[2*i+1] = 1;
+            }
+        }
+
         int nCycles = 5;
 
         // This is the BIMP/TIMP form.
@@ -629,6 +635,18 @@ public class SATAlgorithmL extends AbstractSATSolver {
             while (C > C_max) {
                 h.get();
                 --C;
+            }
+        }
+
+        // temporarily: what are the arcs we have in the BIMP table for the items in CAND?
+        for (int i = 0; i < C; ++i) {
+            final int v = CAND[i];
+            System.out.printf("Candidate variable %d\n", v);
+            for (int l = 2*v; l <= 2*v+1; ++l) {
+                TIntArrayList bimp = BIMP[l];
+                for (int j = 0; j < bimp.size(); ++j) {
+                    System.out.printf("  %d --> %d\n", dl(l), dl(bimp.getQuick(j)));
+                }
             }
         }
 
