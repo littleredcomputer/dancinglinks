@@ -95,8 +95,9 @@ public class ExactCoverProblem {
     }
 
     /**
-     * Add an option (nonempty subset of established items). Empty options are
-     * ignored. Repeated items in an option are ignored. Referring to an unknown
+     * Add an option (nonempty subset of established items). Empty options or options
+     * continaing a repeated item will throw IllegalArgumentException.
+     * Referring to an unknown
      * option will throw. The colon character is special: An option given in the
      * form o:c refers to item o with color c.
      * @param items sequence of item names

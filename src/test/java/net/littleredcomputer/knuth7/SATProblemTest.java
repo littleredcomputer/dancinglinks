@@ -1,6 +1,7 @@
 package net.littleredcomputer.knuth7;
 
 import com.google.common.collect.ImmutableList;
+import org.hamcrest.Matcher;
 import org.junit.Test;
 
 import java.io.InputStreamReader;
@@ -9,6 +10,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -17,6 +19,7 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.number.IsCloseTo.closeTo;
 import static org.hamcrest.number.OrderingComparison.greaterThan;
 import static org.junit.Assert.assertThat;
 
@@ -105,14 +108,12 @@ public class SATProblemTest {
     }
 
     @Test
-    public void setRand3_420_100_0_L() {
+    public void rand3_420_100_0_L() {
         assertThat(new SATAlgorithmL(rand3_420_100_0).solve(), isEmpty());
     }
 
     @Test
-    public void setRand3_420_100_0_D() {
-        assertThat(new SATAlgorithmD(rand3_420_100_0).solve(), isEmpty());
-    }
+    public void rand3_420_100_0_D() { assertThat(new SATAlgorithmD(rand3_420_100_0).solve(), isEmpty()); }
 
 
 // currently L takes almost 4 hours to do this (at this writing, we don't have X
@@ -395,7 +396,22 @@ public class SATProblemTest {
         SATProblem w = waerdenProblem(3, 3, 9);
         SATAlgorithmL a = new SATAlgorithmL(w);
         a.useX = true;
-        a.solve();
+        // a.solve();
+        a.X();
+
+        List<Matcher<? super Double>> expectedHValues = DoubleStream.of(
+                0, 0,
+                168.6, 168.6,
+                157.3, 157.3,
+                233.4, 233.4,
+                231.8, 231.8,
+                284.0, 284.0,
+                231.8, 231.8,
+                233.4, 233.4,
+                157.3, 157.3,
+                168.6, 168.6).mapToObj(d -> closeTo(d, 0.05)).collect(toList());
+
+        assertThat(a.Hscores(), contains(expectedHValues));
     }
 
     @Test

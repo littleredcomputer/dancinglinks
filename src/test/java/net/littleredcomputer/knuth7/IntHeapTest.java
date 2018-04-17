@@ -38,17 +38,19 @@ public class IntHeapTest {
             final boolean up = (t & 1) == 1;
             IntHeap h = new IntHeap(A, A.length, up ? Integer::compare : (r,s) -> Integer.compare(s,r));
             for (int k = 0; k < cutoff; ++k) h.get();
+            IntStream lefties = Arrays.stream(A, 0, A.length - cutoff);
+            IntStream righties = Arrays.stream(A, A.length - cutoff, A.length);
             if (up) {
                 // We've generated a random array, heapified it, and then drawn off the
                 // top member cutoff times. Each time, the extracted value has been put
                 // at the end of the array. At this point, every element to the left of
                 // the cutoff point should be <= every element to the right.
-                int maxLeft = Arrays.stream(A, 0, A.length - cutoff).max().orElseThrow(IllegalStateException::new);
-                int minRight = Arrays.stream(A, A.length - cutoff, A.length).min().orElseThrow(IllegalStateException::new);
+                int maxLeft = lefties.max().orElseThrow(IllegalStateException::new);
+                int minRight = righties.min().orElseThrow(IllegalStateException::new);
                 assertThat(maxLeft, lessThanOrEqualTo(minRight));
             } else {
-                int minLeft = Arrays.stream(A, 0, A.length - cutoff).min().orElseThrow(IllegalStateException::new);
-                int maxRight = Arrays.stream(A, A.length - cutoff, A.length).max().orElseThrow(IllegalStateException::new);
+                int minLeft = lefties.min().orElseThrow(IllegalStateException::new);
+                int maxRight = righties.max().orElseThrow(IllegalStateException::new);
                 assertThat(minLeft, greaterThanOrEqualTo(maxRight));
             }
         }
