@@ -152,7 +152,7 @@ public class SATProblem {
                     }
                     clauses.add(clause);
                 });
-        SATProblem p = new SATProblem(varMap.size() + 1);
+        SATProblem p = new SATProblem(varMap.size());
         clauses.forEach(p::addClause);
         return p;
     }

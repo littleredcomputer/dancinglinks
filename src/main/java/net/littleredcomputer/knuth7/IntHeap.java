@@ -7,7 +7,6 @@ public class IntHeap {
     private final IntBinaryOperator compare;
     private int n;
 
-
     IntHeap(int[] a, int n, IntBinaryOperator compare) {
         this.a = a;
         this.n = n;
@@ -23,11 +22,9 @@ public class IntHeap {
         }
     }
 
-    private static int iLeftChild(int i) { return 2*i + 1; }
-
     private void siftDown(int[] A, int start, int end) {
         int root = start, child;
-        while ((child = iLeftChild(root)) <= end) {
+        while ((child = 2*root+1) <= end) {
             int swap = root;
             if (compare.applyAsInt( A[swap], A[child]) < 0) swap = child;
             if (child+1 <= end && compare.applyAsInt(A[swap], A[child+1]) < 0) swap = child+1;

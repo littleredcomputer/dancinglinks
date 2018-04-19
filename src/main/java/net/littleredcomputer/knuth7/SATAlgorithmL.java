@@ -16,14 +16,24 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private static final int NT = RT - 2;
     private static final int PT = RT - 2;
 
-    class Literal {
-        Literal() {};
+    static class Literal {
+        Literal(int id) { this.id = id; }
 
+        final int id;  // whatever you want (typically, the unencoded literal value)
         int TSIZE = 0;
         int BSIZE = 0;
         int IST = 0;
         int TIMP;
-        TIntArrayList BIMP = new TIntArrayList();
+        final TIntArrayList BIMP = new TIntArrayList();
+
+        // auxiliary data for Tarjan's algorithm
+        int rank;
+        Literal parent;  // points to the parent of this vertex (which is another vertex or Λ.
+        int untagged;  // index of first arc originating at this vertex which remains untagged
+        Literal link;  // link to next vertex in {active, settled} vertex stack
+        Literal min;  // active vertex of smallest rank having the following property:
+        // "Either u ≡ v or there is a directed path from v to u consisting of zero or
+        //  more mature tree arcs followed by a single non-tree arc."
     }
 
     // These next 4 arrays all grow in sync.
@@ -68,7 +78,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         final int nVariables = problem.nVariables();
         final int literalAllocation = 2 * nVariables + 2;
         lit = new Literal[literalAllocation];
-        Arrays.setAll(lit, i -> new Literal());
+        Arrays.setAll(lit, Literal::new);
         VAR = new int[nVariables];
         VAL = new int[nVariables+1];
         DEC = new int[nVariables];
