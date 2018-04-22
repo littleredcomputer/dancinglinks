@@ -1,6 +1,5 @@
 package net.littleredcomputer.knuth7;
 
-import com.google.common.collect.ImmutableList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.stack.TIntStack;
 import gnu.trove.stack.array.TIntArrayStack;
@@ -22,11 +21,12 @@ public class SATAlgorithmL extends AbstractSATSolver {
         final int id;  // whatever you want (typically, the unencoded literal value)
         int TSIZE = 0;
         int BSIZE = 0;
-        int IST = 0;
+        long IST = 0;
         int TIMP;
         final TIntArrayList BIMP = new TIntArrayList();
 
         // auxiliary data for Tarjan's algorithm
+        long bstamp;  // bstamp value identifies current generation of candidates
         int rank;
         Literal parent;  // points to the parent of this vertex (which is another vertex or Λ.
         int untagged;  // index of first arc originating at this vertex which remains untagged
@@ -34,6 +34,14 @@ public class SATAlgorithmL extends AbstractSATSolver {
         Literal min;  // active vertex of smallest rank having the following property:
         // "Either u ≡ v or there is a directed path from v to u consisting of zero or
         //  more mature tree arcs followed by a single non-tree arc."
+
+        // Knuth economizes on literal memory by reusing the untagged field for height,
+        // and the min field for child.
+
+        // XXX should we split them out as a courtesy to those who may read this code
+        // in the future?
+
+        final TIntArrayList arcs = new TIntArrayList();  // projection of BIMP table down to the set of candidate variables
     }
 
     // These next 4 arrays all grow in sync.
@@ -50,7 +58,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private final int[] BACKI;
     private final int[] INX;  // INX[v] is the index of variable v in VAR
     private final int[] BRANCH;
-    private final int[] R;
+    private final int[] R;  // stack of literals
     private final int[] CAND;  // candidates for algorithm X
     private final double[][] h;  // h[d][l] is the h-score ("rough heuristic") of literal l at depth d
     private final double[] H;  // H[l] is the "more discriminating" score for literal l at the current depth (Eq. 67)
@@ -63,8 +71,10 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private int E = 0;  // literals R[k] are "nearly true" for G <= k < E.
     private int F = 0;
     private int G = 0;
-    private int ISTAMP = 0;
+    private long ISTAMP = 0;  // Knuth points out (sat11.w:1528) that this could conceivably overflow a 32-bit int
+    private long BSTAMP = 0;  // stamp value of current candidate list in algorithm X
     private int d = 0;  // current depth within search tree
+    private int state = 2;  // currently executing step of algorithm L
     boolean useX = false;  // whether to use algorithm X for lookahead
 
     private enum Fixity {
@@ -87,7 +97,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
         INX = new int[nVariables + 1];
         CAND = new int[nVariables];
         BRANCH = new int[nVariables];
-        R = new int[nVariables+1];  // stack to record the names of literals that have received values
+        R = new int[nVariables+1];  // stack to record the names of literals that have received values.
+        // A literal and its complement never appear together here, so nVariables is enough space (but: one-based)
         h = new double[nVariables][];
         H = new double[literalAllocation];
         r = new double[nVariables + 1];
@@ -293,9 +304,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
         final int nVariables = problem.nVariables();
         int CONFLICT = 0;
         int N = VAR.length;
-        int state = 2;
         int l = 0;
-        int L = 0;
+        //int L = 0;
 
         STEP:
         while (true) {
@@ -359,16 +369,16 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     }
                     FORCE.resetQuick();
 
-                case 6:  // Choose a nearly true l.
+                case 6: { // Choose a nearly true l.
                     if (log.isTraceEnabled()) log.trace("Choose a nearly true l. G=%d, E=%d\n", G, E);
                     if (G == E) {
                         state = 10;
                         continue;
                     }
-                    L = R[G];
+                    int L = R[G];
                     ++G;
                     if (log.isTraceEnabled()) log.trace("Chose %d. Now G=%d", dl(L), G);
-                case 7: {  // Promote L to real truth.
+                // case 7:  Promote L to real truth.
                     if (log.isTraceEnabled()) log.trace("** Promote %d to real truth\n", dl(L));
                     int X = L >> 1;
                     VAL[X] = RT + (L & 1);
@@ -405,7 +415,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                                 V.set(t, l0 ^ 1);
                                 LINK.set(t, ppp);
 
-                                // NOT IN KNUTH: reset pp, ppp.
+                                // NOT IN KNUTH: reset pp.
                                 pp = t;
                                 // END NOT IN KNUTH
                             }
@@ -648,32 +658,61 @@ public class SATAlgorithmL extends AbstractSATSolver {
             IntHeap h = new IntHeap(CAND, C, (v,w) -> Double.compare(r[w], r[v]));
             for (; C > C_max; --C) h.get();
         }
-
-        // Now compute big H with equation (67)
+        ++BSTAMP;
+        int candLitCount = 0;
+        // Mark surviving candidates with the new BSTAMP value, and compute big H with equation (67).
         Arrays.fill(H, 0);
         for (int i = 0; i < C; ++i) {
             final int c = CAND[i];
-            for (int l = 2*c; l <= 2*c+1; ++l) {
-                for (int j = lit[l].TIMP, k = 0; k < lit[l].TSIZE; j = NEXT.getQuick(j), ++k) {
+            for (int l0 = 2*c; l0 <= 2*c+1; ++l0) {
+                final Literal l = lit[l0];
+                l.bstamp = BSTAMP;
+                for (int j = l.TIMP, k = 0; k < l.TSIZE; j = NEXT.getQuick(j), ++k) {
                     //System.out.printf("%d => %d and %d\n", dl(l), dl(U.getQuick(j)), dl(V.getQuick(j)));
-                    H[l] += hd[U.getQuick(j)] * hd[V.getQuick(j)];
+                    H[l0] += hd[U.getQuick(j)] * hd[V.getQuick(j)];
                 }
             }
         }
-
-        // temporarily: what are the arcs we have in the BIMP table for the items in CAND?
+        int arcCount = 0;
+        // Compute candidate BIMP list.
         for (int i = 0; i < C; ++i) {
-            final int v = CAND[i];
-            System.out.printf("Candidate variable %d\n", v);
-            for (int l = 2*v; l <= 2*v+1; ++l) {
-                TIntArrayList bimp = lit[l].BIMP;
-                for (int j = 0; j < bimp.size(); ++j) {
-                    System.out.printf("  %d --> %d\n", dl(l), dl(bimp.getQuick(j)));
+            final int c = CAND[i];
+            for (int l0 = 2*c; l0 <= 2*c+1; ++l0) {
+                final Literal l = lit[l0];
+                l.arcs.resetQuick();
+                TIntArrayList bimp = l.BIMP;
+                for (int j = 0; j < l.BSIZE; ++j) {
+                    int v = bimp.getQuick(j);
+                    if (l0 < v && lit[v].bstamp == BSTAMP) {
+                        // Knuth: we add v --> u to the candidate arcs when there's an implication u => v in the BIMP table.
+                        // We also add the arc ¬v --> ¬u. By enforcing l0 < v, we ensure that both directions are added
+                        // atomically (the BIMP table contains both arrows, but not contiguously; if we are going to cap
+                        // the number of arcs we consider, it is important that we don't strand one arc of a pair outside
+                        // the graph).
+                        System.out.printf("adding arcs: %d -> %d, %d -> %d\n", dl(l0), dl(v), dl(v^1), dl(l0^1));
+                        l.arcs.add(v);
+                        lit[v^1].arcs.add(l0^1);
+                        arcCount += 2;
+                    }
                 }
             }
         }
+        System.out.printf("added %d arcs overall", arcCount);
 
         // X4 [Nest the candidates.]
+
+        ConnectedComponents cc = new ConnectedComponents(lit);
+        cc.find(CAND, C);
+
+        // Construct a sequence of literals LL[j] and corresponding truth offsets LO[j], for 0 <= j < S.
+
+        // Note: for the graph work, Knuth makes a projection down to the candidate set for BIMP data.
+        // We might as well do the same? Or should we define an iterator that only processes arcs whose
+        // tips lie in the candidate subset?
+
+
+        // NB: the BIMP tables will contain arcs that may not refer to variables in the CAND set.
+
 
 
         // "Construct a lookahead forest, represented in LL[j] and LO[j] for 0 ≤ j < S
@@ -694,9 +733,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         // X13 [Recover from conflict.]
     }
 
-    public List<Double> Hscores() {
-        ImmutableList.Builder<Double> b = ImmutableList.builder();
-        for (int i = 0; i < H.length; ++i) b.add(H[i]);
-        return b.build();
+    public Collection<Double> Hscores() {
+        return Arrays.stream(H).boxed().collect(Collectors.collectingAndThen(Collectors.toList(), Collections::unmodifiableCollection));
     }
 }

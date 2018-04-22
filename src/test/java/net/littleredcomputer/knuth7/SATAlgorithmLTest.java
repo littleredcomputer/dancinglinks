@@ -1,0 +1,65 @@
+package net.littleredcomputer.knuth7;
+
+import org.hamcrest.Matcher;
+import org.junit.Test;
+
+import java.util.List;
+import java.util.function.Function;
+import java.util.stream.DoubleStream;
+
+import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
+import static java.util.stream.Collectors.toList;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.number.IsCloseTo.closeTo;
+import static org.junit.Assert.assertThat;
+
+public class SATAlgorithmLTest extends TestProblems {
+    private Function<SATProblem, AbstractSATSolver> L = SATAlgorithmL::new;
+    private Function<SATProblem, AbstractSATSolver> L3 = L.compose(SATProblem::to3SAT);
+
+    @Test public void ex6() { testEx6With(L); }
+    @Test public void ex7() { testEx7With(L); }
+
+    @Test public void w3_3() { assertThat(waerden(3, 3, L), is(9)); }
+    @Test public void w3_4() { assertThat(waerden(3, 4, L3), is(18)); }
+    @Test public void w4_3() { assertThat(waerden(4, 3, L3), is(18)); }
+    //@Test public void w4_4() { assertThat(waerden(4, 4, L3), is(35)); }
+    @Test public void w3_6() { assertThat(waerden(3, 6, L3), is(32)); }
+    //@Test public void w4_5() { assertThat(waerden(4, 5, L3), is(55)); }
+    //@Test public void w5_4() { assertThat(waerden(5, 4, L3), is(55)); }
+    @Test public void w6_3() { assertThat(waerden(6, 3, L3), is(32)); }
+
+    @Test public void langford() { testLangfordWith(L3); }
+    @Test public void hole6() { testHole6With(L3); }
+    @Test public void dubois() { testDuboisWith(L); }
+    @Test public void testQueen5() { testQueen5With(L3); }
+    @Test public void testMutex4BitsL1() { testMutex4BitsL1With(L3); }
+    @Test public void testZebra() { testZebraWith(L3); }
+    @Test public void testQuinn() { testQuinnWith(L); }
+
+    @Test public void rand3_420_100_0_L() { assertThat(L.apply(rand3_420_100_0).solve(), isEmpty()); }
+
+    @Test
+    public void algorithmX() {
+        SATProblem w = waerdenProblem(3, 3, 9);
+        SATAlgorithmL a = new SATAlgorithmL(w);
+        a.useX = true;
+        a.solve();
+        //a.X();
+
+        List<Matcher<? super Double>> expectedHValues = DoubleStream.of(0, 168.6, 157.3, 233.4, 231.8, 284.0, 231.8, 233.4, 157.3, 168.6)
+                .flatMap(d -> DoubleStream.of(d, d))
+                .mapToObj(d -> closeTo(d, 0.05))
+                .collect(toList());
+
+        //assertThat(a.Hscores(), contains(expectedHValues));
+    }
+// currently L takes almost 4 hours to do this (at this writing, we don't have X
+//    @Test
+//    public void rand3_1061_L() {
+//        assertThat(new SATAlgorithmL(rand3_1061).solve().map(rand3_1061::evaluate), isPresentAndIs(true));
+//    }
+
+
+
+}

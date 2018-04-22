@@ -3,12 +3,14 @@
     <words>
       <w>dimacs</w>
       <w>exactcover</w>
+      <w>langford</w>
       <w>littleredcomputer</w>
       <w>loginterval</w>
       <w>satisfiability</w>
       <w>sudoku</w>
       <w>taocp</w>
       <w>unremove</w>
+      <w>waerden</w>
       <w>wordfind</w>
     </words>
   </dictionary>
