@@ -7,9 +7,9 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.DoubleStream;
 
-import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
 import static java.util.stream.Collectors.toList;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.number.IsCloseTo.closeTo;
 import static org.junit.Assert.assertThat;
 
@@ -37,29 +37,37 @@ public class SATAlgorithmLTest extends TestProblems {
     @Test public void testZebra() { testZebraWith(L3); }
     @Test public void testQuinn() { testQuinnWith(L); }
 
-    @Test public void rand3_420_100_0_L() { assertThat(L.apply(rand3_420_100_0).solve(), isEmpty()); }
+    @Test public void rand3_420_100_0_L() { assertUNSAT(rand3_420_100_0, L); }
 
     @Test
     public void algorithmX() {
         SATProblem w = waerdenProblem(3, 3, 9);
         SATAlgorithmL a = new SATAlgorithmL(w);
         a.useX = true;
+        a.stopAtStep = 1;
         a.solve();
-        //a.X();
 
+        // Data from [F6, p. 41]: "The more discriminating scores H(l) turn out to be:"
         List<Matcher<? super Double>> expectedHValues = DoubleStream.of(0, 168.6, 157.3, 233.4, 231.8, 284.0, 231.8, 233.4, 157.3, 168.6)
                 .flatMap(d -> DoubleStream.of(d, d))
                 .mapToObj(d -> closeTo(d, 0.05))
                 .collect(toList());
 
-        //assertThat(a.Hscores(), contains(expectedHValues));
+        assertThat(a.Hscores(), contains(expectedHValues));
     }
-// currently L takes almost 4 hours to do this (at this writing, we don't have X
-//    @Test
-//    public void rand3_1061_L() {
-//        assertThat(new SATAlgorithmL(rand3_1061).solve().map(rand3_1061::evaluate), isPresentAndIs(true));
-//    }
 
+    @Test
+    public void aX2() {
+        SATProblem p = SATProblem.parseKnuth("a ~b\na ~c\nc ~d\n");
+        SATAlgorithmL a = new SATAlgorithmL(p);
+        a.useX = true;
+        a.stopAtStep = 1;
+        a.solve();
+    }
 
-
+    // currently L takes almost 4 hours to do this (at this writing, we don't have X
+    //    @Test
+    //    public void rand3_1061_L() {
+    //        assertThat(new SATAlgorithmL(rand3_1061).solve().map(rand3_1061::evaluate), isPresentAndIs(true));
+    //    }
 }

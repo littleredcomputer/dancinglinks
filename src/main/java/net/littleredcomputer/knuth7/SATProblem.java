@@ -86,13 +86,18 @@ public class SATProblem {
         return Optional.of(solution);
     }
 
-    public boolean evaluate(boolean[] solution) {
+    /**
+     * Evaluate the boolean function represented by the problem's clauses at the specified point
+     * @param p (point (i.e., vector of booleans) at which to evaluate
+     * @return the truth value of this problem at p
+     */
+    public boolean evaluate(boolean[] p) {
         CLAUSE:
         for (int i = 1; i < clauses.size(); ++i) {
             List<Integer> clause = clauses.get(i);
             for (int literal : clause) {
                 // One true literal in the clause is enough to make the whole clause true.
-                if (solution[(literal >> 1) - 1] == ((literal & 1) == 0)) continue CLAUSE;
+                if (p[(literal >> 1) - 1] == ((literal & 1) == 0)) continue CLAUSE;
             }
             return false;  // Any false clause is enough to spoil satisfaction.
         }
@@ -132,6 +137,7 @@ public class SATProblem {
         return p;
     }
 
+    public static SATProblem parseKnuth(String s) { return parseKnuth(new StringReader(s)); }
     public static SATProblem parseKnuth(Reader r) {
         HashMap<String, Integer> varMap = new HashMap<>();
         List<List<Integer>> clauses = new ArrayList<>();
@@ -157,6 +163,14 @@ public class SATProblem {
         return p;
     }
 
+    /**
+     * If this problem contains clauses with length > 3, we construct a new, equivalent
+     * 3-SAT instance by replacing the long clauses with new 3-clauses, using new auxiliary
+     * variables. Any new variables created will be assigned numbers just beyond those
+     * in the original problem. If the original problem is already 3-SAT, we merely return
+     * the original instance, no copy is made.
+     * @return An equivalent problem in 3-SAT.
+     */
     public SATProblem to3SAT() {
         if (this.height <= 3) return this;
         List<List<Integer>> newClauses = new ArrayList<>();

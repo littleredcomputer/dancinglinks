@@ -15,6 +15,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private static final int NT = RT - 2;
     private static final int PT = RT - 2;
 
+
     static class Literal {
         Literal(int id) { this.id = id; }
 
@@ -75,7 +76,12 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private long BSTAMP = 0;  // stamp value of current candidate list in algorithm X
     private int d = 0;  // current depth within search tree
     private int state = 2;  // currently executing step of algorithm L
+    private int CONFLICT = 0;  // XXX we probably don't want this as an actual state variable.
+    // We suspect it's only being used to allow a subroutine to influence the control flow of
+    // its caller and there are other ways to do that.
+    private int l = 0;
     boolean useX = false;  // whether to use algorithm X for lookahead
+    int stopAtStep = -1;  // for testing purposes: abandon search at this step number
 
     private enum Fixity {
         UNFIXED,
@@ -88,7 +94,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         final int nVariables = problem.nVariables();
         final int literalAllocation = 2 * nVariables + 2;
         lit = new Literal[literalAllocation];
-        Arrays.setAll(lit, Literal::new);
+        Arrays.setAll(lit, i -> new Literal(dl(i)));
         VAR = new int[nVariables];
         VAL = new int[nVariables+1];
         DEC = new int[nVariables];
@@ -301,14 +307,15 @@ public class SATAlgorithmL extends AbstractSATSolver {
     @Override
     public Optional<boolean[]> solve() {
         start();
-        final int nVariables = problem.nVariables();
-        int CONFLICT = 0;
-        int N = VAR.length;
-        int l = 0;
-        //int L = 0;
+        final int N = VAR.length;
 
         STEP:
         while (true) {
+            if (stepCount == stopAtStep) {
+                log.error("Exhausted budget of solution steps at #%d. Returning UNSAT, " +
+                        "but this is not certain as the search was abandoned.", stepCount);
+                return Optional.empty();
+            }
             ++stepCount;
             if (stepCount % logCheckSteps == 0) {
                 maybeReportProgress(this::stateToString);
@@ -321,9 +328,9 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         continue;
                     }
                     // Step X1:  Satisfied?
-                    if (F == nVariables) {
-                        boolean sat[] = new boolean[nVariables];
-                        for (int i = 1; i <= nVariables; ++i) sat[i-1] = (VAL[i] & 1) == 0;
+                    if (F == N) {
+                        boolean sat[] = new boolean[N];
+                        for (int i = 1; i <= N; ++i) sat[i-1] = (VAL[i] & 1) == 0;
                         return Optional.of(sat);
                     }
                     if (useX) {
@@ -383,13 +390,13 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     int X = L >> 1;
                     VAL[X] = RT + (L & 1);
                     // Remove variable X from the free list and from all TIMP pairs (ex. 137).
-                    N = nVariables - G;
-                    int x = VAR[N];
+                    final int N1 = N - G;
+                    int x = VAR[N1];
                     int j = INX[X];
                     VAR[j] = x;
                     INX[x] = j;
-                    VAR[N] = X;
-                    INX[X] = N;
+                    VAR[N1] = X;
+                    INX[X] = N1;
                     for (int l0 = 2 * X; l0 <= 2 * X + 1; ++l0) {
                         // System.out.printf("purging %d\n", dl(l0));
                         for (int p = lit[l0].TIMP, tcount = 0; tcount < lit[l0].TSIZE; p = NEXT.get(p), ++tcount) {
@@ -445,7 +452,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     for (int p = lit[L].TIMP, tcount = 0; tcount < lit[L].TSIZE; p = NEXT.get(p), ++tcount) {
                         boolean conflict = !consider(U.get(p), V.get(p));
                         if (conflict) {
-                            state = CONFLICT;
+                            state = this.CONFLICT;
                             continue STEP;
                         }
                     }
@@ -526,7 +533,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
      * Knuth's Algorithm X, which is used to gather information guiding the selection of literals
      * in Algorithm L.
      */
-    public void X() {
+    void X() {
         final int nVariables = problem.nVariables();
         final int N = nVariables - F;
         double[] hd = h[d];
@@ -678,10 +685,10 @@ public class SATAlgorithmL extends AbstractSATSolver {
         for (int i = 0; i < C; ++i) {
             final int c = CAND[i];
             for (int l0 = 2*c; l0 <= 2*c+1; ++l0) {
-                final Literal l = lit[l0];
-                l.arcs.resetQuick();
-                TIntArrayList bimp = l.BIMP;
-                for (int j = 0; j < l.BSIZE; ++j) {
+                final Literal u = lit[l0];
+                u.arcs.resetQuick();
+                TIntArrayList bimp = u.BIMP;
+                for (int j = 0; j < u.BSIZE; ++j) {
                     int v = bimp.getQuick(j);
                     if (l0 < v && lit[v].bstamp == BSTAMP) {
                         // Knuth: we add v --> u to the candidate arcs when there's an implication u => v in the BIMP table.
@@ -690,14 +697,14 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         // the number of arcs we consider, it is important that we don't strand one arc of a pair outside
                         // the graph).
                         System.out.printf("adding arcs: %d -> %d, %d -> %d\n", dl(l0), dl(v), dl(v^1), dl(l0^1));
-                        l.arcs.add(v);
+                        u.arcs.add(v);
                         lit[v^1].arcs.add(l0^1);
                         arcCount += 2;
                     }
                 }
             }
         }
-        System.out.printf("added %d arcs overall", arcCount);
+        System.out.printf("added %d arcs overall\n", arcCount);
 
         // X4 [Nest the candidates.]
 
@@ -721,7 +728,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         // X5 [Prepare to explore.]
 
         int Up = 0, jp = 0, BASE = 0, j = 0;
-        int conflict = 13;
+        CONFLICT = 13;
 
         // X6 [Choose l for lookahead.]
         // X7 [Move to next.]
@@ -733,7 +740,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         // X13 [Recover from conflict.]
     }
 
-    public Collection<Double> Hscores() {
+    Collection<Double> Hscores() {
         return Arrays.stream(H).boxed().collect(Collectors.collectingAndThen(Collectors.toList(), Collections::unmodifiableCollection));
     }
 }

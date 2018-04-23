@@ -16,7 +16,6 @@ import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresent;
 import static java.util.stream.Collectors.toSet;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.number.OrderingComparison.greaterThan;
 import static org.junit.Assert.assertThat;
 
 public class SATProblemTest extends TestProblems {
@@ -79,8 +78,7 @@ public class SATProblemTest extends TestProblems {
         assertThat(q.height(), is(3));
         assertThat(q.nClauses(), is(n-2));
         Optional<boolean[]> qsol = new SATAlgorithmA(q).solve();
-        assertThat(qsol, isPresent());
-        qsol.ifPresent(bs -> assertThat(countTrueBits(bs), is(greaterThan(0))));
+        assertThat(qsol.map(q::evaluate), isPresent());
     }
 
     @Test

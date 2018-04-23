@@ -1,5 +1,7 @@
 package net.littleredcomputer.knuth7;
 
+import com.google.common.primitives.Booleans;
+
 import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.util.ArrayList;
@@ -18,19 +20,6 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
 class TestProblems {
-
-    static String toBinaryString(boolean[] bs) {
-        StringBuilder s = new StringBuilder();
-        for (boolean b : bs) s.append(b ? '1' : '0');
-        return s.toString();
-    }
-
-    static int countTrueBits(boolean[] bs) {
-        int c = 0;
-        for (boolean b : bs) if (b) ++c;
-        return c;
-    }
-
     /**
      * Generate the SAT problem waerden(j, j; n), defined by 7.2.2.2 (10), in dimacs format.
      *
@@ -140,7 +129,10 @@ class TestProblems {
         List<Optional<Integer>> expected = range.get().mapToObj(i -> i % 4 == 0 || i % 4 == 3 ? Optional.of(i) : Optional.<Integer>empty()).collect(toList());
         Stream<Optional<Integer>> observed = range.get().mapToObj(i -> {
             SATProblem Li = langfordProblem(i);
-            return a.apply(Li).solve().map(k -> Arrays.copyOfRange(k, 0, Li.nVariables())).map(TestProblems::countTrueBits);
+            return a.apply(Li).solve()
+                    .map(k -> Arrays.copyOfRange(k, 0, Li.nVariables()))
+                    .map(Booleans::asList)
+                    .map(bs -> bs.stream().mapToInt(b -> b ? 1 : 0).sum());
         });
         assertThat(observed.collect(toList()), is(expected));
     }
@@ -168,11 +160,11 @@ class TestProblems {
     static final SATProblem rand3_420_100_0 = SATProblem.randomInstance(3, 420, 100, 0);
 
 
-    private void assertSAT(SATProblem p, Function<SATProblem, AbstractSATSolver> a) {
+    void assertSAT(SATProblem p, Function<SATProblem, AbstractSATSolver> a) {
         assertThat(a.apply(p).solve().map(p::evaluate), isPresentAndIs(true));
     }
 
-    private void assertUNSAT(SATProblem p, Function<SATProblem, AbstractSATSolver> a) {
+    void assertUNSAT(SATProblem p, Function<SATProblem, AbstractSATSolver> a) {
         assertThat(a.apply(p).solve(), isEmpty());
     }
     void testHole6With(Function<SATProblem, AbstractSATSolver> a) { assertUNSAT(hole6, a); }
