@@ -29,7 +29,7 @@ abstract class AbstractSATSolver {
     }
 
     void start() {
-        stopwatch.start();
+        if (!stopwatch.isRunning()) stopwatch.start();
         lastLogTime = Instant.now();
         lastStepCount = stepCount;
     }

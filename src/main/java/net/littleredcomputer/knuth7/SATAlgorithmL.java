@@ -15,7 +15,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private static final int NT = RT - 2;
     private static final int PT = RT - 2;
 
-
     static class Literal {
         Literal(int id) { this.id = id; }
 
@@ -30,6 +29,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         long bstamp;  // bstamp value identifies current generation of candidates
         int rank;
         Literal parent;  // points to the parent of this vertex (which is another vertex or Λ.
+        Literal vcomp;  // for component representatives: the component member of maximum rating
         int untagged;  // index of first arc originating at this vertex which remains untagged
         Literal link;  // link to next vertex in {active, settled} vertex stack
         Literal min;  // active vertex of smallest rank having the following property:
@@ -42,8 +42,19 @@ public class SATAlgorithmL extends AbstractSATSolver {
         // XXX should we split them out as a courtesy to those who may read this code
         // in the future?
 
+        Literal child;
+        int height;
+
         final TIntArrayList arcs = new TIntArrayList();  // projection of BIMP table down to the set of candidate variables
     }
+
+    static class Lookahead {
+        final Literal literal;
+        final int offset;
+
+        Lookahead(Literal l, int o) { literal = l; offset = o; }
+    }
+
 
     // These next 4 arrays all grow in sync.
     private final TIntArrayList U = new TIntArrayList();
@@ -60,7 +71,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private final int[] INX;  // INX[v] is the index of variable v in VAR
     private final int[] BRANCH;
     private final int[] R;  // stack of literals
-    private final int[] CAND;  // candidates for algorithm X
+    private final int[] CAND;  // candidate variables for algorithm X
+    private final int[] CANDL;  // candidate literals for algorithm X
     private final double[][] h;  // h[d][l] is the h-score ("rough heuristic") of literal l at depth d
     private final double[] H;  // H[l] is the "more discriminating" score for literal l at the current depth (Eq. 67)
     private final double[] r;    // r[x] is the "rating" of variable x in step X3
@@ -68,6 +80,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
     // Instead, we implement ISTACK as a pair of stacks of primitive ints.
     private final TIntStack ISTACKb = new TIntArrayStack();  // stack of literals
     private final TIntStack ISTACKs = new TIntArrayStack();  // stack of BIMP table sizes for corresponding literals above
+    private final int seed = 0;
+    private final SGBRandom rng = new SGBRandom(seed);
     private int T = NT;  // truth degree (F6 7.2.2.2 p. 37)
     private int E = 0;  // literals R[k] are "nearly true" for G <= k < E.
     private int F = 0;
@@ -83,6 +97,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     boolean useX = false;  // whether to use algorithm X for lookahead
     int stopAtStep = -1;  // for testing purposes: abandon search at this step number
 
+
     private enum Fixity {
         UNFIXED,
         FIXED_T,
@@ -94,7 +109,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         final int nVariables = problem.nVariables();
         final int literalAllocation = 2 * nVariables + 2;
         lit = new Literal[literalAllocation];
-        Arrays.setAll(lit, i -> new Literal(dl(i)));
+        Arrays.setAll(lit, Literal::new);
         VAR = new int[nVariables];
         VAL = new int[nVariables+1];
         DEC = new int[nVariables];
@@ -102,6 +117,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         BACKI = new int[nVariables];
         INX = new int[nVariables + 1];
         CAND = new int[nVariables];
+        CANDL = new int[2*nVariables];
         BRANCH = new int[nVariables];
         R = new int[nVariables+1];  // stack to record the names of literals that have received values.
         // A literal and its complement never appear together here, so nVariables is enough space (but: one-based)
@@ -171,9 +187,32 @@ public class SATAlgorithmL extends AbstractSATSolver {
             lit[l].BSIZE = lit[l].BIMP.size();
         }
         FORCE.addAll(units);
+
+        // Knuth scrambles the order of the free variables here. I don't love this, since the
+        // RNG he uses is also used for other randomization purposes: this makes the exact behavior
+        // of the algorithm overly determined by details of the implementation, IMO.
+
+        // Case in point: for the hash_bits array, which we are not using (yet),
+        // Knuth generates 92*8 random numbers; to
+        // get consistent results, we have to "burn" this many
+        for (int k = 92; k != 0; --k) for (int j = 0; j < 8; ++j) rng.nextRand();
+
         for (int k = 0; k < nVariables; ++k) {
-            VAR[k] = k + 1;
-            INX[k + 1] = k;
+            final int j = rng.unifRand(k+1);
+            System.out.printf("ur(%d) = %d\n", k+1, j);
+            if (j != k) {
+                int i = VAR[j];
+                VAR[k] = i;
+                INX[i] = k;
+                VAR[j] = k+1;
+                INX[k+1] = j;
+            } else {
+                VAR[k] = k + 1;
+                INX[k + 1] = k;
+            }
+        }
+        for (int k = 0; k < nVariables; ++k) {
+            System.out.printf("variable order: %d\n", VAR[k]);
         }
     }
 
@@ -628,8 +667,10 @@ public class SATAlgorithmL extends AbstractSATSolver {
         for (int i = 0; i < C; ++i) {
             final int v = CAND[i];
             r[v] = hd[2*v] * hd[2*v+1];
+            System.out.printf("Rating(%d) = %g\n", v, r[v]);
             r_sum += r[v];
         }
+
 
         final double C_max = d == 0 ? C1 : Integer.max(C0, C1/d);  // Eq. (66)
 
@@ -680,46 +721,104 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 }
             }
         }
-        int arcCount = 0;
+        candLitCount = 0;
         // Compute candidate BIMP list.
         for (int i = 0; i < C; ++i) {
             final int c = CAND[i];
+            System.out.printf("CAND[%d] = %d\n", i, c);
             for (int l0 = 2*c; l0 <= 2*c+1; ++l0) {
+                CANDL[candLitCount++] = l0;
                 final Literal u = lit[l0];
                 u.arcs.resetQuick();
+                u.vcomp = u;  // A field we will use after resolving into strong components
                 TIntArrayList bimp = u.BIMP;
                 for (int j = 0; j < u.BSIZE; ++j) {
                     int v = bimp.getQuick(j);
-                    if (l0 < v && lit[v].bstamp == BSTAMP) {
+                    if (v > l0 && lit[v].bstamp == BSTAMP) {
                         // Knuth: we add v --> u to the candidate arcs when there's an implication u => v in the BIMP table.
                         // We also add the arc ¬v --> ¬u. By enforcing l0 < v, we ensure that both directions are added
                         // atomically (the BIMP table contains both arrows, but not contiguously; if we are going to cap
                         // the number of arcs we consider, it is important that we don't strand one arc of a pair outside
                         // the graph).
-                        System.out.printf("adding arcs: %d -> %d, %d -> %d\n", dl(l0), dl(v), dl(v^1), dl(l0^1));
-                        u.arcs.add(v);
-                        lit[v^1].arcs.add(l0^1);
-                        arcCount += 2;
+                        System.out.printf("adding arcs: %d -> %d, %d -> %d\n", dl(v), dl(l0), dl(l0^1), dl(v^1));
+                        lit[v].arcs.add(l0);
+                        lit[l0^1].arcs.add(v^1);
                     }
                 }
             }
         }
-        System.out.printf("added %d arcs overall\n", arcCount);
 
         // X4 [Nest the candidates.]
 
         ConnectedComponents cc = new ConnectedComponents(lit);
-        cc.find(CAND, C);
+        cc.find(CANDL, candLitCount);
+
+
+        // TODO: Knuth's Tarjan algorithm is modified to notice when ~v lives in v's SCC.
+        // Our implementation does not notice this, but it would be easy to check, for
+        // all literals among the candidates, that
+
+
+        for (Literal s = cc.settled(); s != null; s = s.link) {
+            System.out.printf("Strong component %d %g\n", dl(s.id), r[s.id>>1]);
+        }
+
+        // Rip over the components, finding, within each, the literal of maximum rating
+        // (this is used as an alternate component representative)
+
+        for (int i = 0; i < C; ++i) {
+            final int c = CAND[i];
+            for (int li = 2 * c; li <= 2 * c + 1; ++li) {
+                final Literal l = lit[li];
+                if (l != l.parent && r[li >> 1] > r[l.parent.vcomp.id >> 1]) {
+                    l.parent.vcomp = l;
+                }
+            }
+        }
 
         // Construct a sequence of literals LL[j] and corresponding truth offsets LO[j], for 0 <= j < S.
 
-        // Note: for the graph work, Knuth makes a projection down to the candidate set for BIMP data.
-        // We might as well do the same? Or should we define an iterator that only processes arcs whose
-        // tips lie in the candidate subset?
+        // Find the heights and the child/sibling links
+        Literal root = lit[0];
+        root.child = null;
+        root.height = -1;
+        Literal uu, p, pp = root, w = null;
+        int height = 0;
+        for (Literal u = cc.settled(); u != null; u = uu) {
+            System.out.printf("considering literal %d\n", dl(u.id));
+            uu = u.link;
+            p = u.parent;
+            if (p != pp) {
+                height = 0;
+                w = root;
+                pp = p;
+            }
+            TIntArrayList arcs = lit[u.id ^ 1].arcs;
+            for (int j = 0; j < arcs.size(); ++j) {
+                Literal v = lit[arcs.getQuick(j) ^ 1];
+                Literal vv = v.parent;
+                if (vv == p) continue;
+                final int hh = vv.height;
+                if (hh >= height) {
+                    height = hh+1;
+                    w = vv;
+                }
+            }
+            if (p == u) {
+                Literal v = w.child;
+                u.height = height;
+                u.child = null;
+                u.link = v;
+                w.child = u;
+            }
+        }
 
+        for (int i = 0; i < candLitCount; ++i) {
+            Literal l = lit[CANDL[i]];
+            System.out.printf("  (#%d) %d has height %d\n", CANDL[i], dl(l.id), l.height);
+        }
 
-        // NB: the BIMP tables will contain arcs that may not refer to variables in the CAND set.
-
+        // The results of our oriented forest computation are placed into an array
 
 
         // "Construct a lookahead forest, represented in LL[j] and LO[j] for 0 ≤ j < S

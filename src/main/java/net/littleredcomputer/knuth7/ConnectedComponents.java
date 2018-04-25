@@ -18,9 +18,15 @@ class ConnectedComponents {
     private SATAlgorithmL.Literal settledStack = null;
     private int nn = 0;
 
+    void foo(SATAlgorithmL a) {
+
+    }
+
     ConnectedComponents(SATAlgorithmL.Literal[] vertices) {
         this.vertices = vertices;
     }
+
+    SATAlgorithmL.Literal settled() { return settledStack; }
 
     void find(int[] view, int viewLength) {
         for (int i = 0; i < viewLength; ++i) {
@@ -85,15 +91,12 @@ class ConnectedComponents {
         activeStack = v.link;
         v.link = settledStack;
         settledStack = t;  // We've moved the top of one stack to the other
-        System.out.printf("Strong component %d", v.id);
-        if (t == v) System.out.println();
-        else {
-            System.out.println(" also includes:");
-            for (; t != v; t = t.link) {
-                System.out.printf("%d (from %d to %d)\n", t.id, t.parent.id, t.min.id);
-                t.rank = Integer.MAX_VALUE;
-                t.parent = v;
-            }
+
+        // System.out.println(" also includes:");
+        for (; t != v; t = t.link) {
+            // System.out.printf("%d (from %d to %d)\n", t.id, t.parent.id, t.min.id);
+            t.rank = Integer.MAX_VALUE;  // now t is settled
+            t.parent = v;  // and its strong component is represented by v
         }
         v.rank = Integer.MAX_VALUE;
         v.parent = v;

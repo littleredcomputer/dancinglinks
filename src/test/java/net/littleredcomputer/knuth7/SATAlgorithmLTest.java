@@ -54,6 +54,9 @@ public class SATAlgorithmLTest extends TestProblems {
                 .collect(toList());
 
         assertThat(a.Hscores(), contains(expectedHValues));
+        a.stopAtStep = 4;
+        a.solve();
+
     }
 
     @Test
