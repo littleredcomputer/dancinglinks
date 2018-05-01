@@ -18,10 +18,6 @@ class ConnectedComponents {
     private SATAlgorithmL.Literal settledStack = null;
     private int nn = 0;
 
-    void foo(SATAlgorithmL a) {
-
-    }
-
     ConnectedComponents(SATAlgorithmL.Literal[] vertices) {
         this.vertices = vertices;
     }

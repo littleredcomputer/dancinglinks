@@ -53,10 +53,9 @@ public class SATAlgorithmLTest extends TestProblems {
                 .mapToObj(d -> closeTo(d, 0.05))
                 .collect(toList());
 
-        assertThat(a.Hscores(), contains(expectedHValues));
+        assertThat(a.x.Hscores(), contains(expectedHValues));
         a.stopAtStep = 4;
         a.solve();
-
     }
 
     @Test
