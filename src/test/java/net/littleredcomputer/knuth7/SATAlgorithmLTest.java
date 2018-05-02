@@ -3,8 +3,10 @@ package net.littleredcomputer.knuth7;
 import org.hamcrest.Matcher;
 import org.junit.Test;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.DoubleStream;
 
 import static java.util.stream.Collectors.toList;
@@ -44,17 +46,18 @@ public class SATAlgorithmLTest extends TestProblems {
         SATProblem w = waerdenProblem(3, 3, 9);
         SATAlgorithmL a = new SATAlgorithmL(w);
         a.useX = true;
-        a.stopAtStep = 1;
+        a.stopAtStep = 0;
         a.solve();
+        a.x.computeHeuristics();
 
-        // Data from [F6, p. 41]: "The more discriminating scores H(l) turn out to be:"
-        List<Matcher<? super Double>> expectedHValues = DoubleStream.of(0, 168.6, 157.3, 233.4, 231.8, 284.0, 231.8, 233.4, 157.3, 168.6)
+        List<Matcher<? super Double>> expectedHValues = DoubleStream.of(
+                0.0, 4.847, 4.562, 6.628, 6.616, 8.234, 6.616, 6.628, 4.562, 4.847)
                 .flatMap(d -> DoubleStream.of(d, d))
                 .mapToObj(d -> closeTo(d, 0.05))
                 .collect(toList());
 
-        assertThat(a.x.Hscores(), contains(expectedHValues));
-        a.stopAtStep = 4;
+        assertThat(Arrays.stream(a.x.h[0]).boxed().collect(Collectors.toList()),  contains(expectedHValues));
+        a.stopAtStep = -1;
         a.solve();
     }
 
@@ -63,7 +66,7 @@ public class SATAlgorithmLTest extends TestProblems {
         SATProblem p = SATProblem.parseKnuth("a ~b\na ~c\nc ~d\n");
         SATAlgorithmL a = new SATAlgorithmL(p);
         a.useX = true;
-        a.stopAtStep = 1;
+        //a.stopAtStep = 1;
         a.solve();
     }
 

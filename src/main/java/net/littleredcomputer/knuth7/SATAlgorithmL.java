@@ -13,7 +13,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private static final Logger log = LogManager.getFormatterLogger();
     private static final int RT = 0x7ffffffe;
     private static final int NT = RT - 2;
-    private static final int PT = RT - 2;
+    private static final int PT = NT - 2;
 
     static class Literal {
         Literal(int id) { this.id = id; }
@@ -48,15 +48,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         final TIntArrayList arcs = new TIntArrayList();  // projection of BIMP table down to the set of candidate variables
     }
 
-<<<<<<< Updated upstream
-    static class Lookahead {
-        final Literal literal;
-        final int offset;
-
-        Lookahead(Literal l, int o) { literal = l; offset = o; }
-    }
-
-=======
     // An array of elements of this type represents the arrays LL and LO in [F6].
     // i.e.: LL[k] = looks[k].literal; LO[k] = looks[k].offset
 
@@ -64,7 +55,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         Literal literal = null;
         int offset = 0;
     }
->>>>>>> Stashed changes
 
     // These next 4 arrays all grow in sync.
     private final TIntArrayList U = new TIntArrayList();
@@ -73,37 +63,21 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private final TIntArrayList NEXT = new TIntArrayList();
     private final TIntArrayList FORCE = new TIntArrayList();
     private final Literal[] lit;
-<<<<<<< Updated upstream
-    private final int[] VAR;
-=======
     private final Lookahead[] look;
     private final int[] VAR;
     private final int[] INX;  // INX[v] is the index of variable v in VAR
->>>>>>> Stashed changes
     private final int[] VAL;  // VAL[i] is the current contextual truth value of VAR[i]
     private final int[] DEC;
     private final int[] BACKF;
     private final int[] BACKI;
-<<<<<<< Updated upstream
-    private final int[] INX;  // INX[v] is the index of variable v in VAR
-=======
->>>>>>> Stashed changes
     private final int[] BRANCH;
     private final int[] R;  // stack of literals
     private final int[] CAND;  // candidate variables for algorithm X
     private final int[] CANDL;  // candidate literals for algorithm X
-<<<<<<< Updated upstream
-    private final double[][] h;  // h[d][l] is the h-score ("rough heuristic") of literal l at depth d
-    private final double[] H;  // H[l] is the "more discriminating" score for literal l at the current depth (Eq. 67)
-    private final double[] r;    // r[x] is the "rating" of variable x in step X3
-=======
->>>>>>> Stashed changes
     // Reading Knuth we might choose to implement ISTACK as a stack of pairs of ints. But that would require boxing.
     // Instead, we implement ISTACK as a pair of stacks of primitive ints.
     private final TIntStack ISTACKb = new TIntArrayStack();  // stack of literals
     private final TIntStack ISTACKs = new TIntArrayStack();  // stack of BIMP table sizes for corresponding literals above
-    private final int seed = 0;
-    private final SGBRandom rng = new SGBRandom(seed);
     private int T = NT;  // truth degree (F6 7.2.2.2 p. 37)
     private int E = 0;  // literals R[k] are "nearly true" for G <= k < E.
     private int F = 0;
@@ -115,17 +89,10 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private int CONFLICT = 0;  // XXX we probably don't want this as an actual state variable.
     // We suspect it's only being used to allow a subroutine to influence the control flow of
     // its caller and there are other ways to do that.
-<<<<<<< Updated upstream
-    private int l = 0;
-    boolean useX = false;  // whether to use algorithm X for lookahead
-    int stopAtStep = -1;  // for testing purposes: abandon search at this step number
-
-=======
     private int l = 0;  // Current branch literal
     boolean useX = false;  // whether to use algorithm X for lookahead
     int stopAtStep = -1;  // for testing purposes: abandon search at this step number
     AlgorithmX x = null;
->>>>>>> Stashed changes
 
     private enum Fixity {
         UNFIXED,
@@ -139,11 +106,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
         final int literalAllocation = 2 * nVariables + 2;
         lit = new Literal[literalAllocation];
         Arrays.setAll(lit, Literal::new);
-<<<<<<< Updated upstream
-=======
         look = new Lookahead[literalAllocation];
         Arrays.setAll(look, i -> new Lookahead());
->>>>>>> Stashed changes
         VAR = new int[nVariables];
         VAL = new int[nVariables+1];
         DEC = new int[nVariables];
@@ -155,12 +119,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         BRANCH = new int[nVariables];
         R = new int[nVariables+1];  // stack to record the names of literals that have received values.
         // A literal and its complement never appear together here, so nVariables is enough space (but: one-based)
-<<<<<<< Updated upstream
-        h = new double[nVariables][];
-        H = new double[literalAllocation];
-        r = new double[nVariables + 1];
-=======
->>>>>>> Stashed changes
 
         Set<Integer> units = new HashSet<>();
         List<Set<Integer>> oBIMP = new ArrayList<>(literalAllocation);
@@ -232,6 +190,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
         // Case in point: for the hash_bits array, which we are not using (yet),
         // Knuth generates 92*8 random numbers; to
         // get consistent results, we have to "burn" this many
+        int seed = 0;
+        SGBRandom rng = new SGBRandom(seed);
         for (int k = 92; k != 0; --k) for (int j = 0; j < 8; ++j) rng.nextRand();
 
         for (int k = 0; k < nVariables; ++k) {
@@ -382,12 +342,9 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
     @Override
     public Optional<boolean[]> solve() {
-<<<<<<< Updated upstream
-=======
         if (useX && x == null) {
             x = new AlgorithmX();
         }
->>>>>>> Stashed changes
         start();
         final int N = VAR.length;
 
@@ -405,34 +362,51 @@ public class SATAlgorithmL extends AbstractSATSolver {
             if (log.isTraceEnabled()) log.trace(">>>> step %d state %d", stepCount, state);
             switch (state) {
                 case 2:  // New node.
-                    if (FORCE.size() > 0) {
-                        state = 5;
-                        continue;
+                    if (FORCE.isEmpty() && F < N && useX) {
+                        boolean ok = x.X();
+                        if (!ok) {
+                            // Go to state 15 if alg. X has discovered a conflict.
+                            System.out.printf("Alg. X detected a contradiction");
+                            state = 15;
+                            continue;
+                        } else {
+                            System.out.printf("Alg. X has returned\n");
+                        }
                     }
                     // Step X1:  Satisfied?
                     if (F == N) {
+                        System.out.println("!SAT!");
                         boolean sat[] = new boolean[N];
                         for (int i = 1; i <= N; ++i) sat[i-1] = (VAL[i] & 1) == 0;
                         return Optional.of(sat);
                     }
-                    if (useX) {
-<<<<<<< Updated upstream
-                        X();
-=======
-                        x.X();
->>>>>>> Stashed changes
-                    }
-                    // Go to state 15 if alg. X has discovered a conflict.
-                    if (FORCE.size() == 0) {
-                        log.trace("Not running algorithm X");
+                    if (FORCE.size() > 0) {
+                        state = 5;
+                        continue;
                     }
                     BRANCH[d] = -1;
                 case 3: {  // Choose l.
-                    // If we had algorithm X, we could make a smart choice.
-                    // Algorithm X can also reply "0".  For now, we're going
-                    // to just pick the first literal that's free.
-                    if (0 >= N) throw new IllegalStateException("Can't find a free var in step 3");
-                    l = 2*VAR[0]+1; // trivial heuristic: deny the first free variable
+                    if (useX) {
+                        // Exercise 168 says:
+                        // Find the l in Lookahead.literal with l mod 2 == 0 and and
+                        // max (H(l)+.1)(H(l+1)+.1). If l is fixed, set l = 0 (in that
+                        // case, algorithm X found at least one fored literal, although
+                        // U (i.e., FORCE.size()) is now zero; we want to do another
+                        // lookahead before branching again. Otherwise if H(l) > H(l+1)
+                        // then ++l.
+                        double maxz = 0;
+                        for (int i = 0; i < x.S; i += 2) {
+                            double z = (x.H[l] + 0.1) * (x.H[l+1] + 0.1);
+                            if (z > maxz) {
+                                maxz = z;
+                                l = i;
+                            }
+                        }
+                        Fixity f = fixity(l);
+                        if (f != Fixity.UNFIXED) l = 0;
+                        else if (x.H[l] > x.H[l+1]) ++l;
+                        System.out.printf("The heuristic data indicated the choice of %d\n", dl(l));
+                    } else l = 2*VAR[0]+1; // trivial heuristic: deny the first free variable
                     if (l == 0) {
                         ++d;
                         state = 2;
@@ -471,7 +445,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     int L = R[G];
                     ++G;
                     if (log.isTraceEnabled()) log.trace("Chose %d. Now G=%d", dl(L), G);
-                // case 7:  Promote L to real truth.
+                    // case 7:  Promote L to real truth.
                     if (log.isTraceEnabled()) log.trace("** Promote %d to real truth\n", dl(L));
                     int X = L >> 1;
                     VAL[X] = RT + (L & 1);
@@ -483,14 +457,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     INX[x] = j;
                     VAR[N1] = X;
                     INX[X] = N1;
-<<<<<<< Updated upstream
-                    for (int l0 = 2 * X; l0 <= 2 * X + 1; ++l0) {
-                        // System.out.printf("purging %d\n", dl(l0));
-                        for (int p = lit[l0].TIMP, tcount = 0; tcount < lit[l0].TSIZE; p = NEXT.get(p), ++tcount) {
-=======
                     for (int xlit = 2 * X; xlit <= 2 * X + 1; ++xlit) {
                         for (int p = lit[xlit].TIMP, tcount = 0; tcount < lit[xlit].TSIZE; p = NEXT.get(p), ++tcount) {
->>>>>>> Stashed changes
                             int u0 = U.get(p);
                             int v = V.get(p);
                             int pp = LINK.get(p);
@@ -572,23 +540,14 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         --E;
                         int X = R[E]>>1;
                         // reactivate the TIMP pairs that involve X and restore X to the free list (ex. 137)
-<<<<<<< Updated upstream
-                        for (int l0 = 2*X + 1; l0 >= 2*X; --l0) {
-                            if (log.isTraceEnabled()) log.trace("Reactivating %d\n",dl(l0));
-=======
                         for (int xlit = 2*X + 1; xlit >= 2*X; --xlit) {
                             if (log.isTraceEnabled()) log.trace("Reactivating %d\n",dl(xlit));
->>>>>>> Stashed changes
                             // Knuth insists (in the printed fascicle) that the downdating of TIMP should
                             // happen in the reverse order of the updating, which would seem to argue for
                             // traversing this linked list in reverse order. However, since each entry in
                             // the TIMP list will point (via U and V) to two strictly other TIMP lists, it's
                             // not clear why the order matters.
-<<<<<<< Updated upstream
-                            for (int p = lit[l0].TIMP, tcount = 0; tcount < lit[l0].TSIZE; p = NEXT.get(p), ++tcount) {
-=======
                             for (int p = lit[xlit].TIMP, tcount = 0; tcount < lit[xlit].TSIZE; p = NEXT.get(p), ++tcount) {
->>>>>>> Stashed changes
                                 int u0 = U.get(p);
                                 int v = V.get(p);
                                 ++lit[v ^ 1].TSIZE;
@@ -625,7 +584,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     continue;
                 default:
                     throw new IllegalStateException("Internal error: illegal state " + state);
-<<<<<<< Updated upstream
             }
         }
     }
@@ -634,305 +592,29 @@ public class SATAlgorithmL extends AbstractSATSolver {
      * Knuth's Algorithm X, which is used to gather information guiding the selection of literals
      * in Algorithm L.
      */
-    void X() {
-        final int nVariables = problem.nVariables();
-        final int N = nVariables - F;
-        double[] hd = h[d];
+    class AlgorithmX {
+
         final double alpha = 3.5;
         final double THETA = 20.0;
         final int C0 = 30, C1 = 600;  // See Ex. 148
-
-        if (hd == null) {
-            h[d] = hd = new double[2*nVariables+2];
-            for (int i = 1; i <= nVariables; ++i) {
-                hd[2*i] = 1;
-                hd[2*i+1] = 1;
-            }
-        }
-
-        int nCycles = 5;
-
-        // This is the BIMP/TIMP form.
-        System.out.printf(" h[d]: %s\n", Arrays.toString(hd));
-
-        // Step X1 is performed before this routine is called.
-        // Step X2: Compile rough heuristics.
-        for (int k = 0; k < nCycles; ++k) {
-            double hAve = 0.0;
-            for (int i = 1; i <= nVariables; ++i) {
-                if (INX[i] < N) {
-                    hAve += hd[2 * i] + hd[2 * i + 1];
-                }
-            }
-            hAve /= 2.0 * nVariables;
-            final double hAve2 = hAve * hAve;
-            double[] hprime = new double[hd.length];
-            for (int i = 1; i <= nVariables; ++i) {
-                if (INX[i] < N) {
-                    for (int l = 2*i; l <= 2*i+1; ++l) {
-                        // update hd[l]
-                        double hp = 0.1;
-                        // for all u in BIMP[l] with u not fixed
-                        TIntArrayList bimpl = lit[l].BIMP;
-                        double hs = 0;
-                        for (int j = 0; j < lit[l].BSIZE; ++j) hs += hd[bimpl.get(j)] / hAve;
-                        hp += alpha * hs;
-                        for (int p = lit[l].TIMP, j = 0; j < lit[l].TSIZE; p = NEXT.get(p), ++j) {
-                            hp += hd[U.get(p)] * hd[V.get(p)] / hAve2;
-                        }
-                        hprime[l] = hp > THETA ? THETA : hp;
-                    }
-                }
-=======
->>>>>>> Stashed changes
-            }
-            System.arraycopy(hprime, 2, hd, 2, 2*nVariables);
-        }
-        System.out.printf(" h0: %s\n", Arrays.toString(h[0]));
-        System.out.printf(" nc: %d\n", problem.nClauses());
-        // Step X3: Preselect candidates.
-        // XXX: how many variables are "participants"?
-        int C = 0;  // for now, we don't know of any.
-
-        if (C == 0) {
-            C = N;
-            System.arraycopy(VAR, 0, CAND, 0, C);
-            // "Terminate happily, however, if all free clauses are satisfied...."
-            // From Ex. 152:
-            //  "Indeed, the absence of free participants means that the fixed-true
-            //   literals form an autarky. If TSIZE(l) is nonzero for any free literal
-            //   l, some clause is unsatisfied. Otherwise all clauses are satisfied
-            //   unless some free l has an unfixed literal lʹ ∈ BIMP(l)."
-            boolean sat = true;
-            VARIABLE: for (int i = 0; i < C; ++i) {
-                final int v = CAND[i];
-                for (int l = 2*v; l <= 2*v+1; ++l) {
-                    // l is a free literal since v is a free variable.
-                    if (lit[l].TSIZE > 0) {
-                        sat = false;
-                        break VARIABLE;
-                    }
-                    TIntArrayList bimpl = lit[l].BIMP;
-                    for (int j = 0; j < lit[l].BSIZE; ++j) {
-                        if (fixity(bimpl.get(j)) == Fixity.UNFIXED) {
-                            sat = false;
-                            break VARIABLE;
-                        }
-                    }
-                }
-            }
-            if (sat) throw new IllegalStateException("X found SAT!");
-        } else {
-            throw new IllegalStateException("Don't know how to proceed yet");
-        }
-
-        // Give each variable x in CAND the rating r(x) = h(x)h(¬x)
-        double r_sum = 0.;
-        for (int i = 0; i < C; ++i) {
-            final int v = CAND[i];
-            r[v] = hd[2*v] * hd[2*v+1];
-            System.out.printf("Rating(%d) = %g\n", v, r[v]);
-            r_sum += r[v];
-        }
-
-
-        final double C_max = d == 0 ? C1 : Integer.max(C0, C1/d);  // Eq. (66)
-
-        log.trace("C_max = %g", C_max);
-
-        // While C > 2 C_max, delete all elements of CAND whose rating
-        // is less than the mean rating; but terminate the loop if no elements are
-        // actually deleted.
-
-        while (C > 2 * C_max) {
-            // Compute the mean score.
-            double r_mean = r_sum / C;
-            boolean deletions = false;
-            r_sum = 0.0;
-            for (int i = 0; i < C; ) {
-                if (r[CAND[i]] < r_mean) {
-                    // This is a bad one. Pull a new one from the end of the candidates list.
-                    CAND[i] = CAND[--C];
-                    deletions = true;
-                } else {
-                    // This is a good one. Keep it, accumulate its score, and go to the next.
-                    r_sum += r[CAND[i]];
-                    ++i;
-                }
-            }
-            if (!deletions) break;
-        }
-        // Finally, if C > C_max, reduce C to C_max by retaining only top-ranked
-        // candidates.
-        if (C > C_max) {
-            // Here's an allocation. Maybe we want to put heapification under
-            // user control. Can we also close over r[] that way... XXX
-            IntHeap h = new IntHeap(CAND, C, (v,w) -> Double.compare(r[w], r[v]));
-            for (; C > C_max; --C) h.get();
-        }
-        ++BSTAMP;
-        int candLitCount = 0;
-        // Mark surviving candidates with the new BSTAMP value, and compute big H with equation (67).
-        Arrays.fill(H, 0);
-        for (int i = 0; i < C; ++i) {
-            final int c = CAND[i];
-            for (int l0 = 2*c; l0 <= 2*c+1; ++l0) {
-                final Literal l = lit[l0];
-                l.bstamp = BSTAMP;
-                for (int j = l.TIMP, k = 0; k < l.TSIZE; j = NEXT.getQuick(j), ++k) {
-                    //System.out.printf("%d => %d and %d\n", dl(l), dl(U.getQuick(j)), dl(V.getQuick(j)));
-                    H[l0] += hd[U.getQuick(j)] * hd[V.getQuick(j)];
-                }
-            }
-        }
-        candLitCount = 0;
-        // Compute candidate BIMP list.
-        for (int i = 0; i < C; ++i) {
-            final int c = CAND[i];
-            System.out.printf("CAND[%d] = %d\n", i, c);
-            for (int l0 = 2*c; l0 <= 2*c+1; ++l0) {
-                CANDL[candLitCount++] = l0;
-                final Literal u = lit[l0];
-                u.arcs.resetQuick();
-                u.vcomp = u;  // A field we will use after resolving into strong components
-                TIntArrayList bimp = u.BIMP;
-                for (int j = 0; j < u.BSIZE; ++j) {
-                    int v = bimp.getQuick(j);
-                    if (v > l0 && lit[v].bstamp == BSTAMP) {
-                        // Knuth: we add v --> u to the candidate arcs when there's an implication u => v in the BIMP table.
-                        // We also add the arc ¬v --> ¬u. By enforcing l0 < v, we ensure that both directions are added
-                        // atomically (the BIMP table contains both arrows, but not contiguously; if we are going to cap
-                        // the number of arcs we consider, it is important that we don't strand one arc of a pair outside
-                        // the graph).
-                        System.out.printf("adding arcs: %d -> %d, %d -> %d\n", dl(v), dl(l0), dl(l0^1), dl(v^1));
-                        lit[v].arcs.add(l0);
-                        lit[l0^1].arcs.add(v^1);
-                    }
-                }
-            }
-        }
-
-        // X4 [Nest the candidates.]
-
-        ConnectedComponents cc = new ConnectedComponents(lit);
-        cc.find(CANDL, candLitCount);
-
-
-        // TODO: Knuth's Tarjan algorithm is modified to notice when ~v lives in v's SCC.
-        // Our implementation does not notice this, but it would be easy to check, for
-        // all literals among the candidates, that
-
-
-        for (Literal s = cc.settled(); s != null; s = s.link) {
-            System.out.printf("Strong component %d %g\n", dl(s.id), r[s.id>>1]);
-        }
-
-        // Rip over the components, finding, within each, the literal of maximum rating
-        // (this is used as an alternate component representative)
-
-        for (int i = 0; i < C; ++i) {
-            final int c = CAND[i];
-            for (int li = 2 * c; li <= 2 * c + 1; ++li) {
-                final Literal l = lit[li];
-                if (l != l.parent && r[li >> 1] > r[l.parent.vcomp.id >> 1]) {
-                    l.parent.vcomp = l;
-                }
-            }
-        }
-
-        // Construct a sequence of literals LL[j] and corresponding truth offsets LO[j], for 0 <= j < S.
-
-        // Find the heights and the child/sibling links
-        Literal root = lit[0];
-        root.child = null;
-        root.height = -1;
-        Literal uu, p, pp = root, w = null;
-        int height = 0;
-        for (Literal u = cc.settled(); u != null; u = uu) {
-            System.out.printf("considering literal %d\n", dl(u.id));
-            uu = u.link;
-            p = u.parent;
-            if (p != pp) {
-                height = 0;
-                w = root;
-                pp = p;
-            }
-            TIntArrayList arcs = lit[u.id ^ 1].arcs;
-            for (int j = 0; j < arcs.size(); ++j) {
-                Literal v = lit[arcs.getQuick(j) ^ 1];
-                Literal vv = v.parent;
-                if (vv == p) continue;
-                final int hh = vv.height;
-                if (hh >= height) {
-                    height = hh+1;
-                    w = vv;
-                }
-            }
-            if (p == u) {
-                Literal v = w.child;
-                u.height = height;
-                u.child = null;
-                u.link = v;
-                w.child = u;
-            }
-        }
-
-        for (int i = 0; i < candLitCount; ++i) {
-            Literal l = lit[CANDL[i]];
-            System.out.printf("  (#%d) %d has height %d\n", CANDL[i], dl(l.id), l.height);
-        }
-
-        // The results of our oriented forest computation are placed into an array
-
-
-        // "Construct a lookahead forest, represented in LL[j] and LO[j] for 0 ≤ j < S
-        // and by PARENT pointers (see ex. 155).
-
-        // X5 [Prepare to explore.]
-
-        int Up = 0, jp = 0, BASE = 0, j = 0;
-        CONFLICT = 13;
-
-        // X6 [Choose l for lookahead.]
-        // X7 [Move to next.]
-        // X8 [Compute sharper heuristic.]
-        // X9 [Exploit an autarky.]
-        // X10 [Optionally look deeper.]
-        // X11 [Exploit unnecessary assignments.]
-        // X12 [Force l.] (this is a subroutine...)
-        // X13 [Recover from conflict.]
-    }
-
-    Collection<Double> Hscores() {
-        return Arrays.stream(H).boxed().collect(Collectors.collectingAndThen(Collectors.toList(), Collections::unmodifiableCollection));
-    }
-
-
-    class AlgorithmX {
+        final int nVariables;
         private int l0 = 0;  // Current lookahead literal (used in algorithm X)
-        double w = 0.0;  // Current weight of lookahead choice
-        private final double[][] h;  // h[d][l] is the h-score ("rough heuristic") of literal l at depth d
+        int S;  // number of candidate literals
+        double w = 0.0;  // Current weight of lookahead choice. TODO it is dodgy that this is an instance variable...
+        final double[][] h;  // h[d][l] is the h-score ("rough heuristic") of literal l at depth d
         private final double[] H;  // H[l] is the "more discriminating" score for literal l at the current depth (Eq. 67)
         private final double[] r;  // r[x] is the "rating" of variable x in step X3 (one-based)
 
         AlgorithmX() {
-            final int nVariables = problem.nVariables();
-            h = new double[nVariables][];
+            nVariables = problem.nVariables();
+            h = new double[nVariables+1][];
             H = new double[2 * nVariables + 2];
             r = new double[nVariables + 1];
         }
 
-        /**
-         * Knuth's Algorithm X, which is used to gather information guiding the selection of literals
-         * in Algorithm L.
-         */
-        boolean X() {
-            final int nVariables = problem.nVariables();
+        double[] computeHeuristics() {
             final int N = nVariables - F;
             double[] hd = h[d];
-            final double alpha = 3.5;
-            final double THETA = 20.0;
-            final int C0 = 30, C1 = 600;  // See Ex. 148
 
             if (hd == null) {
                 h[d] = hd = new double[2*nVariables+2];
@@ -980,6 +662,20 @@ public class SATAlgorithmL extends AbstractSATSolver {
             }
             System.out.printf(" h0: %s\n", Arrays.toString(h[0]));
             System.out.printf(" nc: %d\n", problem.nClauses());
+            return hd;
+        }
+
+        /**
+         * Knuth's Algorithm X, which is used to gather information guiding the selection of literals
+         * in Algorithm L.
+         */
+        boolean X() {
+            if (F == nVariables) {
+                System.out.printf("Returning because F == N before we even start X\n");
+                return true;
+            }
+            final int N = nVariables - F;
+            final double[] hd = computeHeuristics();
             // Step X3: Preselect candidates.
             // XXX: how many variables are "participants"?
             int C = 0;  // for now, we don't know of any.
@@ -1075,7 +771,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     }
                 }
             }
-            int S = 0;
+            S = 0;
             // Compute candidate BIMP list.
             for (int i = 0; i < C; ++i) {
                 final int c = CAND[i];
@@ -1186,8 +882,9 @@ public class SATAlgorithmL extends AbstractSATSolver {
             // Construct a sequence of literals LL[j] and corresponding truth offsets LO[j], for 0 <= j < S.
             // This is the "lookahead forest."
 
-            int looks = 0, j = 0;
+            int looks = 0;
             {
+                int j = 0;
                 Literal u = root.child, v = null;
                 LOOK: while (true) {
                     look[looks].literal = u.vcomp;
@@ -1215,8 +912,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         }
                     }
                 }
+                if (j != looks + looks) throw new IllegalStateException("confusion(looks)");
             }
-            if (j != looks + looks) throw new IllegalStateException("confusion(looks)");
             for (int i = 0; i < looks; ++i) {
                 System.out.printf("LOOK #%-3d : %d %d\n", i, dl(look[i].literal.id), look[i].offset);
             }
@@ -1224,31 +921,38 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
             // X5 [Prepare to explore.]
 
-            int Up = 0, jp = 0, BASE = 0;
-            j = 0;
-            // CONFLICT = 13;
+            int Up = 0, jp = 0, j = 0;
+            int BASE = 2;  // Knuth sets BASE = 0 in F6, but sets BASE = 2 in sat11.w
             int xstate = 6;
+            int xStepCount = 0;
             // Move to avoid allocation. When to reset this?
             TIntArrayList W = new TIntArrayList();
 
             STEP: while (true) {
+                //System.out.printf("X in state %d. j = %d\n", xstate, j);
+                ++stepCount;
+                if (stepCount == stopAtStep) {
+
+                }
                 switch (xstate) {
                     case 6: { // [Choose l for lookahead.]
                         l = look[j].literal.id;
                         T = BASE + look[j].offset;
                         H[l] = lit[l].parent != null ? H[lit[l].parent.id] : 0;
+                        System.out.printf("state 6 considers: %d @%d H=%.4g j=%d\n", dl(l), T, H[l], j);
 
                         Fixity f = fixity(l);
                         if (f == Fixity.UNFIXED) {
-                            state = 8;
+                            xstate = 8;
                             continue;
                         }
-                        if (f == Fixity.FIXED_F && VAL[l] < PT) {
-                            X12(l ^ 1);
+                        if (f == Fixity.FIXED_F && VAL[thevar(l)] < PT) {
+                            X12(not(l));
                         }
                     }
                     /* fall through */
                     case 7:  // [Move to next.]
+                        //System.out.printf("now state 7\n");
                         if (FORCE.size() > Up) {
                             Up = FORCE.size();
                             jp = j;
@@ -1257,24 +961,35 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         if (j == S) {
                             j = 0;
                             BASE += 2 * S;
-                            if (j == jp || j == 0 && BASE + 2 * S >= PT) return true;
                         }
-                        state = 6;
+                        if (j == jp || j == 0 && BASE + 2 * S >= PT) {
+                            System.out.printf("through looking ahead because we ran out of things\n");
+                            return true;
+                        }
+                        xstate = 6;
                         continue;
                     case 8: { // [Compute sharper heuristic.]
-                        if (!Perform72(T)) { state = 13; continue; }
+                        //System.out.printf("now state 8...\n");
+                        if (!Perform72()) { state = 13; continue; }
                         // Then...
                         if (w > 0) {
                             H[l0] += w;
-                            state = 10;
+                            xstate = 10;
                             continue;
                         }
                     }
-                    case 9:  // [Exploit an autarky.]
-                        if (H[l0] == 0) X12(l0);
-                        // Generate the binary clause l0 | ~PARENT(l0)
-                        appendToBimp(not(l0), not(lit[l0].parent.id));
-                        appendToBimp(lit[l0].parent.id, l0);
+                    case 9:  // [Exploi/t an autarky.]
+                        System.out.printf("autarky at %d\n", dl(l0));
+                        if (H[l0] == 0) {
+                            if (!X12(l0)) {
+                                xstate = 13;
+                                continue;
+                            }
+                        } else {
+                            // Generate the binary clause l0 | ~PARENT(l0)
+                            appendToBimp(not(l0), not(lit[l0].parent.id));
+                            appendToBimp(lit[l0].parent.id, l0);
+                        }
                     case 10:  // [Optionally look deeper.]
                     case 11:  // [Exploit necessary assignments.]
                         TIntArrayList bimp = lit[l0 ^ 1].BIMP;
@@ -1283,27 +998,28 @@ public class SATAlgorithmL extends AbstractSATSolver {
                             Fixity f = fixity(u);
                             if (f == Fixity.FIXED_T && VAL[u] < PT) X12(u);
                         }
-                        state = 7;
+                        xstate = 7;
                         continue;
                     case 12:
                         // is a subroutine.
                     case 13:  // [Recover from conflict.]
+                        System.out.printf("now state 13! conflict.\n");
                         if (T < PT && X12(not(l0))) {
-                            state = 7;
+                            xstate = 7;
                             continue ;
                         }
                         return false;  // we have discovered a contradiction
                 }
             }
         }
-        boolean Perform72(int T) {
-            // WHERE I LEFT OFF: should l0 be a parameter? Or should we make it an instance variable?
+
+        boolean Perform72() {
             l0 = l;
             double w = 0;
             G = E = F;
             // allocation
             TIntArrayList W = new TIntArrayList();
-
+            System.out.printf("%sfixing %d\n", tName(T), dl(l));
             if (!propagate(l)) return false;  // Perform (62).
             while (G < E) {
                 Literal L = lit[R[G]];
@@ -1318,12 +1034,14 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         W.add(v);
                         propagate(v);
                     }
-                    if (fu == Fixity.UNFIXED && fv == Fixity.FIXED_F) {
+                    else if (fu == Fixity.UNFIXED && fv == Fixity.FIXED_F) {
                         W.add(u);
                         propagate(u);
                     }
-                    assert fu == Fixity.UNFIXED && fv == Fixity.UNFIXED;
-                    w += h[d][u] * h[d][v];
+                    else {
+                        assert fu == Fixity.UNFIXED && fv == Fixity.UNFIXED;
+                        w += h[d][u] * h[d][v];
+                    }
                 }
                 // generate new binary clauses (lbar_0 | w) for w in W.
                 for (int i = 0; i < W.size(); ++i) {
@@ -1336,20 +1054,23 @@ public class SATAlgorithmL extends AbstractSATSolver {
         }
 
         boolean X12(int l) {
-            System.out.printf("forcing %d", dl(l));
+            //System.out.printf("forcing %d\n", dl(l));
             FORCE.add(l);
-            return Perform72(PT);
-        }
-
-        Collection<Double> Hscores() {
-            return Arrays.stream(H).boxed().collect(Collectors.collectingAndThen(Collectors.toList(), Collections::unmodifiableCollection));
+            int oldT = T;
+            T = PT;
+            boolean result = Perform72();
+            T = oldT;
+            return result;
         }
 
     }
 
+    private String tName(int t) {
+        if (t >= RT) return "real";
+        if (t >= NT) return "near";
+        if (t >= PT) return "proto";
+        return Integer.toString(t);
+    }
 
-
-
-    private static int not(int l) { return l^1; }
 
 }

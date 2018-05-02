@@ -64,4 +64,7 @@ abstract class AbstractSATSolver {
     }
 
     public abstract Optional<boolean[]> solve();
+
+    static int thevar(int literal) { return literal >> 1; }
+    static int not(int l) { return l^1; }
 }
