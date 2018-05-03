@@ -208,9 +208,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 INX[k + 1] = k;
             }
         }
-        for (int k = 0; k < nVariables; ++k) {
-            System.out.printf("variable order: %d\n", VAR[k]);
-        }
     }
 
     /**
