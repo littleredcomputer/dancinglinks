@@ -47,28 +47,30 @@ public class LifeTest {
         assertThat(blinker1.step(), is(blinker0));
     }
     @Test public void toadsAlternate() {
-        assertThat(toad0, is(not(toad1)));
-        assertThat(toad0.step(), is(toad1));
-        assertThat(toad1.step(), is(toad0));
+        assertThat(Stream.iterate(toad0, Life::step)
+                .limit(4)
+                .collect(Collectors.toList()),
+                contains(toad0, toad1, toad0, toad1));
     }
     @Test public void beaconsAlternate() {
-        assertThat(beacon0, is(not(beacon1)));
-        assertThat(beacon0.step(), is(beacon1));
-        assertThat(beacon1.step(), is(beacon0));
+        assertThat(Stream.iterate(beacon0, Life::step)
+                        .limit(4)
+                        .collect(Collectors.toList()),
+                contains(beacon0, beacon1, beacon0, beacon1));
     }
     @Test public void crossHasPeriod3() {
         assertThat(Stream.iterate(cross, Life::step)
-                        .limit(4)
+                        .limit(7)
                         .map(x -> x.equals(cross))
                         .collect(Collectors.toList()),
-                contains(true, false, false, true));
+                contains(true, false, false, true, false, false, true));
     }
     @Test public void ancestor1() {
         Life l = Life.fromDots("..... .*.*. ..*.. .*.*. .....");
-        SATProblem p = l.ancestor();
-        SATAlgorithmD solver = new SATAlgorithmD(p);
-        Optional<Life> sol = solver.solve().map(s -> Life.fromSolution(5, 5, s));
-        assertThat(sol.map(Life::step), isPresentAndIs(l));
+        assertThat(new SATAlgorithmD(l.ancestor())
+                .solve()
+                .map(s -> Life.fromSolution(l.r, l.c, s))
+                .map(Life::step), isPresentAndIs(l));
     }
     @Test public void ancestorOneLine() {
         Life l = Life.fromDots("...***...");
@@ -92,6 +94,8 @@ public class LifeTest {
      *   * create the SAT problem corresponding to the ancestors of Lʹ
      *   * solve it (it has a solution because we generated the tableau via step)
      *   * ensure that the step of the solution results in Lʹ.
+     * It need not be true that the solution is the same as L. A life tableau may have several
+     * ancestors.
      */
     private void testRandomGridAncestor(Function<SATProblem, AbstractSATSolver> solver, int N, int r, int c) {
         SGBRandom rng = new SGBRandom(314159);
@@ -114,8 +118,62 @@ public class LifeTest {
     @Test public void random6x6B() { testRandomGridAncestor(SATAlgorithmB::new, 20, 6, 6); }
     @Test public void random7x7D() { testRandomGridAncestor(SATAlgorithmD::new, 20, 7, 7); }
     @Test public void random6x6D() { testRandomGridAncestor(SATAlgorithmD::new, 20, 6, 6); }
+
+
     // These are too hard for L3 at the moment.
     // @Test public void random7x7L3() { testRandomGridAncestor(p -> new SATAlgorithmL(p.to3SAT()), 20, 7, 7); }
     // @Test public void random6x6L3() { testRandomGridAncestor(p -> new SATAlgorithmL(p.to3SAT()), 20, 6, 6); }
+
+    /* @Test */ public void testGrid() {
+        Life l = Life.fromDots(
+            "...................... " +
+            "............*.*....... " +
+            "..***..***..*...*.**.. " +
+            ".*....*...*.*.*.**..*. " +
+            ".*....*...*.*.*.*...*. " +
+            "..***..***..*.*.*...*. " +
+            "...................... ");
+        Optional<boolean[]> solution = new SATAlgorithmD(l.ancestor()).solve();
+        solution.ifPresent(s -> System.out.println(Life.fromSolution(l.r, l.c, s)));
+    }
+
+    /* @Test */ public void testGrid2() {
+        Life l = Life.fromDots(".............*........ " +
+                "..***..*.**....*.***.. " +
+                ".*...*.**..*.*.**...*. " +
+                ".*****.*.....*.*....*. " +
+                ".*.....*.....*.*....*. " +
+                "..***..*.....*.*....*. ");
+        for (int i = 1; i < 4; ++i) {
+            Optional<boolean[]> solution = new SATAlgorithmD(l.ancestor()).solve();
+            if (!solution.isPresent()) {
+                System.out.println("unsat :(");
+                break;
+            }
+            l = Life.fromSolution(l.r, l.c, solution.get());
+            System.out.printf("STEP %d\n", i);
+            System.out.println(l);
+        }
+    }
+
+    @Test public void testGrid3() {
+        Life l = Life.fromDots(
+                "........ " +
+                "..*..*.. " +
+                "........ " +
+                ".*....*. " +
+                "..****.. " +
+                "........ ");
+        for (int i = 1; i < 4; ++i) {
+            Optional<boolean[]> solution = new SATAlgorithmD(l.ancestor()).solve();
+            if (!solution.isPresent()) {
+                System.out.println("unsat :(");
+                break;
+            }
+            l = Life.fromSolution(l.r, l.c, solution.get());
+            System.out.printf("STEP %d\n", i);
+            System.out.println(l);
+        }
+    }
 
 }
