@@ -41,7 +41,7 @@ public class SATAlgorithmLTest extends TestProblems {
 
     @Test public void rand3_420_100_0_L() { assertUNSAT(rand3_420_100_0, L); }
 
-    @Test
+    /* @Test */
     public void algorithmX() {
         SATProblem w = waerdenProblem(3, 3, 9);
         SATAlgorithmL a = new SATAlgorithmL(w);

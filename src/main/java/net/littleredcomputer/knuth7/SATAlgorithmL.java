@@ -196,7 +196,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
         for (int k = 0; k < nVariables; ++k) {
             final int j = rng.unifRand(k+1);
-            System.out.printf("ur(%d) = %d\n", k+1, j);
             if (j != k) {
                 int i = VAR[j];
                 VAR[k] = i;
@@ -372,7 +371,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     }
                     // Step X1:  Satisfied?
                     if (F == N) {
-                        System.out.println("!SAT!");
                         boolean sat[] = new boolean[N];
                         for (int i = 1; i <= N; ++i) sat[i-1] = (VAL[i] & 1) == 0;
                         return Optional.of(sat);

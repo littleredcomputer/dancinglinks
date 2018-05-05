@@ -21,7 +21,7 @@ public class SATProblem {
     private int nLiterals = 0;
     private int height = 0;
 
-    private SATProblem(int nVariables) {
+    SATProblem(int nVariables) {
         if (nVariables < 1) throw new IllegalArgumentException("Must have at least one variable");
         this.nVariables = nVariables;
     }
@@ -65,7 +65,7 @@ public class SATProblem {
         return sign * (literal >> 1);
     }
 
-    private void addClause(Iterable<Integer> literals) {
+    void addClause(Iterable<Integer> literals) {
         List<Integer> clause = StreamSupport.stream(literals.spliterator(), false).map(SATProblem::encodeLiteral).collect(Collectors.collectingAndThen(toList(), Collections::unmodifiableList));
         final int s = clause.size();
         nLiterals += s;

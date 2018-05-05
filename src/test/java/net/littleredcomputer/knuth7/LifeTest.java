@@ -2,9 +2,13 @@ package net.littleredcomputer.knuth7;
 
 import org.junit.Test;
 
+import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresent;
+import static com.github.npathai.hamcrestopt.OptionalMatchers.isPresentAndIs;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 
@@ -38,6 +42,7 @@ public class LifeTest {
     @Test public void boatIsStationary() { assertThat(boat.step(), is(boat)); }
     @Test public void tubIsStationary() { assertThat(tub.step(), is(tub)); }
     @Test public void blinkersAlternate() {
+        assertThat(blinker0, is(not(blinker1)));
         assertThat(blinker0.step(), is(blinker1));
         assertThat(blinker1.step(), is(blinker0));
     }
@@ -58,4 +63,59 @@ public class LifeTest {
                         .collect(Collectors.toList()),
                 contains(true, false, false, true));
     }
+    @Test public void ancestor1() {
+        Life l = Life.fromDots("..... .*.*. ..*.. .*.*. .....");
+        SATProblem p = l.ancestor();
+        SATAlgorithmD solver = new SATAlgorithmD(p);
+        Optional<Life> sol = solver.solve().map(s -> Life.fromSolution(5, 5, s));
+        assertThat(sol.map(Life::step), isPresentAndIs(l));
+    }
+    @Test public void ancestorOneLine() {
+        Life l = Life.fromDots("...***...");
+        assertThat(new SATAlgorithmD(l.ancestor())
+                .solve()
+                .map(s -> Life.fromSolution(l.r, l.c, s))
+                .map(Life::step), isPresentAndIs(l));
+    }
+    @Test public void ancestorOneColumn() {
+        Life l = Life.fromDots(". . . * * * . . .");
+        assertThat(new SATAlgorithmD(l.ancestor())
+                .solve()
+                .map(s -> Life.fromSolution(l.r, l.c, s))
+                .map(Life::step), isPresentAndIs(l));
+    }
+
+    /**
+     * Do the following N times:
+     *   * create a random r x c Life grid L (where each cell has a 50% chance to be populated)
+     *   * step it forward to get Lʹ
+     *   * create the SAT problem corresponding to the ancestors of Lʹ
+     *   * solve it (it has a solution because we generated the tableau via step)
+     *   * ensure that the step of the solution results in Lʹ.
+     */
+    private void testRandomGridAncestor(Function<SATProblem, AbstractSATSolver> solver, int N, int r, int c) {
+        SGBRandom rng = new SGBRandom(314159);
+        for (int t = 0; t < N; ++t) {
+            Life l0 = new Life(r, c);
+            // We generate a random tableau, and step it: this results in a tableau that has at least
+            // one ancestor, so we know the corresponding SAT instance will be solvable.
+            for (int i = 0; i < r; ++i) for (int j = 0; j < c; ++j) l0.x[i][j] = rng.unifRand(2) > 0;
+            Life l = l0.step();
+            Optional<Life> sol = solver.apply(l.ancestor()).solve().map(s -> Life.fromSolution(r, c, s));
+             //System.out.printf("original %s\n step %s\n ancestor %s\n", l0, l, sol);
+            assertThat(sol, isPresent());
+            sol.ifPresent(a -> assertThat(a.step(), is(l)));
+        }
+    }
+
+    @Test public void random7x7A() { testRandomGridAncestor(SATAlgorithmA::new, 20, 7, 7); }
+    @Test public void random6x6A() { testRandomGridAncestor(SATAlgorithmA::new, 20, 6, 6); }
+    @Test public void random7x7B() { testRandomGridAncestor(SATAlgorithmB::new, 20, 7, 7); }
+    @Test public void random6x6B() { testRandomGridAncestor(SATAlgorithmB::new, 20, 6, 6); }
+    @Test public void random7x7D() { testRandomGridAncestor(SATAlgorithmD::new, 20, 7, 7); }
+    @Test public void random6x6D() { testRandomGridAncestor(SATAlgorithmD::new, 20, 6, 6); }
+    // These are too hard for L3 at the moment.
+    // @Test public void random7x7L3() { testRandomGridAncestor(p -> new SATAlgorithmL(p.to3SAT()), 20, 7, 7); }
+    // @Test public void random6x6L3() { testRandomGridAncestor(p -> new SATAlgorithmL(p.to3SAT()), 20, 6, 6); }
+
 }
