@@ -67,4 +67,5 @@ abstract class AbstractSATSolver {
 
     static int thevar(int literal) { return literal >> 1; }
     static int not(int l) { return l^1; }
+    static boolean negated(int l) { return (l & 1) != 0; }
 }

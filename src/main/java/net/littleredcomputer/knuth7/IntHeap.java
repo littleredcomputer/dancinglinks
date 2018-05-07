@@ -2,7 +2,7 @@ package net.littleredcomputer.knuth7;
 
 import java.util.function.IntBinaryOperator;
 
-public class IntHeap {
+class IntHeap {
     private final int[] a;
     private final IntBinaryOperator compare;
     private int n;

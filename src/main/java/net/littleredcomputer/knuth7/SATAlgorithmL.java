@@ -15,14 +15,19 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private static final int NT = RT - 2;
     private static final int PT = NT - 2;
 
+    static class Variable {
+        int SIG = 0;  // binary signature discussed in the solution to F6 Exercise 149
+        int SIGL = Integer.MAX_VALUE;  // "infinitely long:" cannot be a prefix of any actual branch history
+    }
+
     static class Literal {
         Literal(int id) { this.id = id; }
 
         final int id;  // whatever you want (typically, the unencoded literal value)
-        int TSIZE = 0;
-        int BSIZE = 0;
+        int TSIZE = 0;  // length of active segment of TIMP list
+        int BSIZE = 0;  // length of active segment of BIMP list
         long IST = 0;
-        int TIMP;
+        int TIMP;  // index of first pair of implicants in U,V arrays
         final TIntArrayList BIMP = new TIntArrayList();
 
         // auxiliary data for Tarjan's algorithm
@@ -63,13 +68,14 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private final TIntArrayList NEXT = new TIntArrayList();
     private final TIntArrayList FORCE = new TIntArrayList();
     private final Literal[] lit;
+    private final Variable[] var;
     private final Lookahead[] look;
     private final int[] VAR;
     private final int[] INX;  // INX[v] is the index of variable v in VAR
     private final int[] VAL;  // VAL[i] is the current contextual truth value of VAR[i]
     private final int[] DEC;
-    private final int[] BACKF;
-    private final int[] BACKI;
+    private final int[] BACKF;  // backtrack value of F, indexed by depth
+    private final int[] BACKI;  // backtrack value of ISTACK size, indexed by depth
     private final int[] BRANCH;
     private final int[] R;  // stack of literals
     private final int[] CAND;  // candidate variables for algorithm X
@@ -90,6 +96,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
     // We suspect it's only being used to allow a subroutine to influence the control flow of
     // its caller and there are other ways to do that.
     private int l = 0;  // Current branch literal
+    private int SIG = 0;  // Current prefix of binary encoding of branch state
+    private int SIGL = 0;
     boolean useX = false;  // whether to use algorithm X for lookahead
     int stopAtStep = -1;  // for testing purposes: abandon search at this step number
     AlgorithmX x = null;
@@ -106,6 +114,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
         final int literalAllocation = 2 * nVariables + 2;
         lit = new Literal[literalAllocation];
         Arrays.setAll(lit, Literal::new);
+        var = new Variable[nVariables+1];
+        Arrays.setAll(var, i -> new Variable());
         look = new Lookahead[literalAllocation];
         Arrays.setAll(look, i -> new Lookahead());
         VAR = new int[nVariables];
@@ -130,7 +140,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     // Put it in the FORCE array, unless it is contradictory
                     final int u = clause.get(0);
                     if (units.contains(u ^ 1))
-                        throw new IllegalArgumentException("Contradictory unit clauses involving variable " + (u >> 1) + " found");
+                        throw new IllegalArgumentException("Contradictory unit clauses involving variable " + thevar(u) + " found");
                     units.add(u);
                     break;
                 }
@@ -143,7 +153,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 }
                 case 3: {
                     // Put it in the TIMP
-                    final int u = clause.get(0), v = clause.get(1), w = clause.get(2);
+                    final int w = clause.get(0), v = clause.get(1), u = clause.get(2);
 
                     int z = U.size();
                     U.add(v);
@@ -251,6 +261,24 @@ public class SATAlgorithmL extends AbstractSATSolver {
     }
 
     private static int dl(int literal) { return SATProblem.decodeLiteral(literal); }
+
+    private void maintainPrefix(int l) {
+        Variable v = var[thevar(l)];
+        int q = v.SIGL;
+        if (q < SIGL) {
+            int t = SIG;
+            // Knuth writes 1LL below, but it's not obvious why
+            if (q < 32) t &= -(1<<(32-q));
+            if (v.SIG != t) {
+                v.SIG = SIG;
+                v.SIGL = SIGL;
+            }
+        } else {
+            v.SIG = SIG;
+            v.SIGL = SIGL;
+        }
+    }
+
     /**
      * Implements steps L8 and L9 of Algorithm L. Returns false if the next step is CONFLICT.
      */
@@ -264,6 +292,9 @@ public class SATAlgorithmL extends AbstractSATSolver {
         else if (fu == Fixity.FIXED_F && fv == Fixity.FIXED_F) return false;
         else if (fu == Fixity.FIXED_F && fv == Fixity.UNFIXED) return propagate(v);
         else if (fv == Fixity.FIXED_F && fu == Fixity.UNFIXED) return propagate(u);
+        // Variable prefix maintenance (See F6 Ex. 149)
+        maintainPrefix(u);
+        maintainPrefix(v);
         // STEP L9: Exploit u || v.
         if (bimpContains(u ^ 1, v ^ 1)) return propagate(u);
         else if (bimpContains(u ^ 1, v)) return true;
@@ -276,7 +307,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
     /* Returns the fixity of l in the context T */
     private Fixity fixity(int l) {
-        int val = VAL[l >> 1];
+        int val = VAL[thevar(l)];
         if (val < T) return Fixity.UNFIXED;
         return (val & 1) == (l & 1) ? Fixity.FIXED_T : Fixity.FIXED_F;
     }
@@ -285,6 +316,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
      * Implements equation (62) of 7.2.2.2. Returns false if the next step is CONFLICT.
      */
     private boolean takeAccountOf(int l) {
+        log.trace("%sfixing %d\n", tName(T), dl(l));
         switch (fixity(l)) {
             case FIXED_T: {
                 break;
@@ -293,7 +325,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 return /* conflict */ false;
             }
             case UNFIXED:
-                VAL[l >> 1] = T + (l & 1);
+                VAL[thevar(l)] = T + (l & 1);
                 R[E] = l;
                 ++E;
         }
@@ -344,6 +376,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
         start();
         final int N = VAR.length;
 
+        // TODO: implement the idea of "compensation resolvents"
+
         STEP:
         while (true) {
             if (stepCount == stopAtStep) {
@@ -362,11 +396,11 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         boolean ok = x.X();
                         if (!ok) {
                             // Go to state 15 if alg. X has discovered a conflict.
-                            System.out.printf("Alg. X detected a contradiction");
+                            log.trace("Alg. X detected a contradiction");
                             state = 15;
                             continue;
                         } else {
-                            System.out.printf("Alg. X has returned\n");
+                            log.trace("Alg. X has returned\n");
                         }
                     }
                     // Step X1:  Satisfied?
@@ -380,27 +414,31 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         continue;
                     }
                     BRANCH[d] = -1;
+                    SIGL = d;
                 case 3: {  // Choose l.
                     if (useX) {
                         // Exercise 168 says:
                         // Find the l in Lookahead.literal with l mod 2 == 0 and and
                         // max (H(l)+.1)(H(l+1)+.1). If l is fixed, set l = 0 (in that
-                        // case, algorithm X found at least one fored literal, although
+                        // case, algorithm X found at least one forced literal, although
                         // U (i.e., FORCE.size()) is now zero; we want to do another
                         // lookahead before branching again. Otherwise if H(l) > H(l+1)
                         // then ++l.
                         double maxz = 0;
-                        for (int i = 0; i < x.S; i += 2) {
-                            double z = (x.H[l] + 0.1) * (x.H[l+1] + 0.1);
+                        for (int i = 0; i < x.S; ++i) {
+                            int cl = look[i].literal.id;
+                            if (negated(cl)) continue;
+                            double z = (x.H[cl] + 0.1) * (x.H[cl+1] + 0.1);
+                            log.trace(" %d, %.4f:%.4f (%.4f)\n", dl(cl), x.H[cl], x.H[cl+1], z);
                             if (z > maxz) {
                                 maxz = z;
-                                l = i;
+                                l = cl;
                             }
                         }
                         Fixity f = fixity(l);
                         if (f != Fixity.UNFIXED) l = 0;
                         else if (x.H[l] > x.H[l+1]) ++l;
-                        System.out.printf("The heuristic data indicated the choice of %d\n", dl(l));
+                        log.trace("The heuristic data indicated the choice of %d\n", dl(l));
                     } else l = 2*VAR[0]+1; // trivial heuristic: deny the first free variable
                     if (l == 0) {
                         ++d;
@@ -414,6 +452,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 }
                 case 4:  // Try l.
                     if (log.isTraceEnabled()) { print(); log.trace("d=%d: Trying %d", d, dl(l)); }
+                    SIGL = d+1;
                     FORCE.resetQuick();
                     FORCE.add(l);
                 case 5:  // Accept near truths.
@@ -442,7 +481,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     if (log.isTraceEnabled()) log.trace("Chose %d. Now G=%d", dl(L), G);
                     // case 7:  Promote L to real truth.
                     if (log.isTraceEnabled()) log.trace("** Promote %d to real truth\n", dl(L));
-                    int X = L >> 1;
+                    log.trace("fixing %d\n", dl(L));
+                    int X = thevar(L);
                     VAL[X] = RT + (L & 1);
                     // Remove variable X from the free list and from all TIMP pairs (ex. 137).
                     final int N1 = N - G;
@@ -456,6 +496,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         for (int p = lit[xlit].TIMP, tcount = 0; tcount < lit[xlit].TSIZE; p = NEXT.get(p), ++tcount) {
                             int u0 = U.get(p);
                             int v = V.get(p);
+                            log.trace("  %d->%d|%d\n", dl(xlit), dl(u0), dl(v));
                             int pp = LINK.get(p);
                             int ppp = LINK.get(pp);
                             int s = lit[u0^1].TSIZE - 1;
@@ -559,6 +600,10 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     }
                 case 14:  // Try again?
                     if (BRANCH[d] == 0) {
+                        // Move to branch 1.  Add a 1 bit to the binary prefix string, unless it is already long enough.
+                        // We don't add zero bits at branch zero. Instead, the prefix starts out at zero, and 1-bits are
+                        // retracted at backtrack time, so we don't need to push 0-bits into the prefix.
+                        if (d < 32) SIG |= 1<<(31-d);
                         l = DEC[d];
                         DEC[d] = l = (l ^ 1);
                         BRANCH[d] = 1;
@@ -573,6 +618,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         return Optional.empty();
                     }
                     --d;
+                    if (d < 31) SIG &= -(1<<(31-d));  // Remove a bit from the binary prefix string
                     E = F;
                     F = BACKF[d];
                     state = 12;
@@ -621,9 +667,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
             int nCycles = 5;
 
-            // This is the BIMP/TIMP form.
-            System.out.printf(" h[d]: %s\n", Arrays.toString(hd));
-
             // Step X1 is performed before this routine is called.
             // Step X2: Compile rough heuristics.
             for (int k = 0; k < nCycles; ++k) {
@@ -655,8 +698,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 }
                 System.arraycopy(hprime, 2, hd, 2, 2*nVariables);
             }
-            System.out.printf(" h0: %s\n", Arrays.toString(h[0]));
-            System.out.printf(" nc: %d\n", problem.nClauses());
             return hd;
         }
 
@@ -666,7 +707,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
          */
         boolean X() {
             if (F == nVariables) {
-                System.out.printf("Returning because F == N before we even start X\n");
+                log.trace("Returning because F == N before we even start X\n");
                 return true;
             }
             final int N = nVariables - F;
@@ -674,6 +715,10 @@ public class SATAlgorithmL extends AbstractSATSolver {
             // Step X3: Preselect candidates.
             // XXX: how many variables are "participants"?
             int C = 0;  // for now, we don't know of any.
+
+            // WHERE WE LEFT OFF: We have got the first cycle of selection working.
+            // Now we need to track candidates and prepare for further iterations
+            // of the selection loop.
 
             if (C == 0) {
                 C = N;
@@ -712,7 +757,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
             for (int i = 0; i < C; ++i) {
                 final int v = CAND[i];
                 r[v] = hd[2*v] * hd[2*v+1];
-                System.out.printf("Rating(%d) = %g\n", v, r[v]);
+                log.trace("Rating(%d) = %g\n", v, r[v]);
                 r_sum += r[v];
             }
 
@@ -925,10 +970,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
             STEP: while (true) {
                 //System.out.printf("X in state %d. j = %d\n", xstate, j);
-                ++stepCount;
-                if (stepCount == stopAtStep) {
-
-                }
                 switch (xstate) {
                     case 6: { // [Choose l for lookahead.]
                         l = look[j].literal.id;
@@ -942,7 +983,10 @@ public class SATAlgorithmL extends AbstractSATSolver {
                             continue;
                         }
                         if (f == Fixity.FIXED_F && VAL[thevar(l)] < PT) {
-                            X12(not(l));
+                            if (!X12(not(l))) {
+                                state = 13;
+                                continue;
+                            }
                         }
                     }
                     /* fall through */
@@ -968,12 +1012,13 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         if (!Perform72()) { state = 13; continue; }
                         // Then...
                         if (w > 0) {
+                            System.out.printf("After P72() we have w = %.4g\n", w);
                             H[l0] += w;
                             xstate = 10;
                             continue;
                         }
                     }
-                    case 9:  // [Exploi/t an autarky.]
+                    case 9:  // [Exploit an autarky.]
                         System.out.printf("autarky at %d\n", dl(l0));
                         if (H[l0] == 0) {
                             if (!X12(l0)) {
@@ -995,8 +1040,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         }
                         xstate = 7;
                         continue;
-                    case 12:
-                        // is a subroutine.
                     case 13:  // [Recover from conflict.]
                         System.out.printf("now state 13! conflict.\n");
                         if (T < PT && X12(not(l0))) {
@@ -1004,17 +1047,19 @@ public class SATAlgorithmL extends AbstractSATSolver {
                             continue ;
                         }
                         return false;  // we have discovered a contradiction
+                    default:
+                        throw new IllegalStateException();
                 }
             }
         }
 
         boolean Perform72() {
             l0 = l;
-            double w = 0;
+            w = 0;
             G = E = F;
             // allocation
             TIntArrayList W = new TIntArrayList();
-            System.out.printf("%sfixing %d\n", tName(T), dl(l));
+            log.trace("%sfixing %d\n", tName(T), dl(l));
             if (!propagate(l)) return false;  // Perform (62).
             while (G < E) {
                 Literal L = lit[R[G]];
@@ -1022,6 +1067,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 // take account of (u, v) for all (u, v) in TIMP(L)
                 for (int t = 0, p = L.TIMP; t < L.TSIZE; ++t, p = NEXT.getQuick(p)) {
                     int u = U.getQuick(p), v = V.getQuick(p);
+                    log.trace("  looking %d->%d|%d\n", dl(l), dl(u), dl(v));
                     Fixity fu = fixity(u), fv = fixity(v);
                     if (fu == Fixity.FIXED_T || fv == Fixity.FIXED_T) continue;
                     if (fu == Fixity.FIXED_F && fv == Fixity.FIXED_F) return false;

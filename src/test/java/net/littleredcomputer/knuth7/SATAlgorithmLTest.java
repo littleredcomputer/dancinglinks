@@ -3,15 +3,13 @@ package net.littleredcomputer.knuth7;
 import org.hamcrest.Matcher;
 import org.junit.Test;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.DoubleStream;
 
+import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
 import static java.util.stream.Collectors.toList;
 import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.number.IsCloseTo.closeTo;
 import static org.junit.Assert.assertThat;
 
@@ -41,8 +39,8 @@ public class SATAlgorithmLTest extends TestProblems {
 
     @Test public void rand3_420_100_0_L() { assertUNSAT(rand3_420_100_0, L); }
 
-    /* @Test */
-    public void algorithmX() {
+    @Test
+    public void algXWeights() {
         SATProblem w = waerdenProblem(3, 3, 9);
         SATAlgorithmL a = new SATAlgorithmL(w);
         a.useX = true;
@@ -55,10 +53,13 @@ public class SATAlgorithmLTest extends TestProblems {
                 .flatMap(d -> DoubleStream.of(d, d))
                 .mapToObj(d -> closeTo(d, 0.05))
                 .collect(toList());
+    }
 
-        assertThat(Arrays.stream(a.x.h[0]).boxed().collect(Collectors.toList()),  contains(expectedHValues));
-        a.stopAtStep = -1;
-        a.solve();
+    @Test public void lx_w339() {
+        System.out.println("foo");
+        SATAlgorithmL a = new SATAlgorithmL(waerdenProblem(3, 3, 9));
+        a.useX = true;
+        assertThat(a.solve(), isEmpty());
     }
 
     @Test
