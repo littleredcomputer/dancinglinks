@@ -38,6 +38,7 @@ public class SATAlgorithmLTest extends TestProblems {
     @Test public void testQuinn() { testQuinnWith(L); }
 
     @Test public void rand3_420_100_0_L() { assertUNSAT(rand3_420_100_0, L); }
+    @Test public void rand3_2062_500_314_L() {assertUNSAT(SATProblem.randomInstance(3, 2062, 500, 314), L); }
 
     @Test
     public void algXWeights() {

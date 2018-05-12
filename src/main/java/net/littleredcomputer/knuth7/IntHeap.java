@@ -1,47 +1,48 @@
 package net.littleredcomputer.knuth7;
 
+import gnu.trove.list.array.TIntArrayList;
+
 import java.util.function.IntBinaryOperator;
 
 class IntHeap {
-    private final int[] a;
+    private final TIntArrayList a;
     private final IntBinaryOperator compare;
-    private int n;
 
-    IntHeap(int[] a, int n, IntBinaryOperator compare) {
+    IntHeap(TIntArrayList a, IntBinaryOperator compare) {
         this.a = a;
-        this.n = n;
         this.compare = compare;
-        heapify();
     }
 
-    public void heapify() {
+    void heapify() {
+        final int n = a.size();
         int start = (n - 2) / 2;
         while (start >= 0) {
-            siftDown(a, start, n-1);
+            siftDown(start, n-1);
             --start;
         }
     }
 
-    private void siftDown(int[] A, int start, int end) {
+    private void siftDown(int start, int end) {
         int root = start, child;
         while ((child = 2*root+1) <= end) {
             int swap = root;
-            if (compare.applyAsInt( A[swap], A[child]) < 0) swap = child;
-            if (child+1 <= end && compare.applyAsInt(A[swap], A[child+1]) < 0) swap = child+1;
+            if (compare.applyAsInt(a.get(swap), a.get(child)) < 0) swap = child;
+            if (child+1 <= end && compare.applyAsInt(a.get(swap), a.get(child+1)) < 0) swap = child+1;
             if (swap == root) return;
-            int tmp = A[root];
-            A[root] = A[swap];
-            A[swap] = tmp;
+            int tmp = a.get(root);
+            a.set(root, a.get(swap));
+            a.set(swap, tmp);
             root = swap;
         }
     }
 
-    public int get() {
-        int top = a[0];
-        --n;
-        a[0] = a[n];
-        a[n] = top;
-        siftDown(a, 0, n-1);
+    public int pop() {
+        int top = a.get(0);
+        if (a.size() > 1) {
+            a.set(0, a.removeAt(a.size() - 1));
+            siftDown(0, a.size() - 1);
+        }
+        else a.resetQuick();
         return top;
     }
 }

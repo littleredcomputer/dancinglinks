@@ -15,6 +15,7 @@ abstract class AbstractSATSolver {
     final int logCheckSteps = 10000;
     protected final SATProblem problem;
     long stepCount;
+    long nodeCount = 0;  // TODO: make sure the other solvers besides L use this
     private long lastStepCount;
     private final String name;
     private Duration logInterval = Duration.ofMillis(1000);
@@ -66,6 +67,8 @@ abstract class AbstractSATSolver {
     public abstract Optional<boolean[]> solve();
 
     static int thevar(int literal) { return literal >> 1; }
+    static int poslit(int variable) { return 2*variable; }
+    static int neglit(int variable) { return 2*variable+1; }
     static int not(int l) { return l^1; }
     static boolean negated(int l) { return (l & 1) != 0; }
 }
