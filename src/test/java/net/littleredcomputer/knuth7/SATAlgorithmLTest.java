@@ -57,11 +57,23 @@ public class SATAlgorithmLTest extends TestProblems {
     }
 
     @Test public void lx_w339() {
-        System.out.println("foo");
         SATAlgorithmL a = new SATAlgorithmL(waerdenProblem(3, 3, 9));
         a.useX = true;
         assertThat(a.solve(), isEmpty());
     }
+
+    @Test public void rand_3_135_32_0() {
+        SATAlgorithmL a = new SATAlgorithmL(SATProblem.randomInstance(3, 135, 32, 0));
+        a.useX = true;
+        assertThat(a.solve(), isEmpty());
+    }
+
+    @Test public void rand_3_300_64_0() {
+        SATAlgorithmL a = new SATAlgorithmL(SATProblem.randomInstance(3, 300, 64, 0));
+        a.useX = true;
+        assertThat(a.solve(), isEmpty());
+    }
+
 
     @Test
     public void aX2() {

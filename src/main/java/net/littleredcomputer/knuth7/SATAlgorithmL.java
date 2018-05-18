@@ -109,8 +109,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
     boolean useX = false;  // whether to use algorithm X for lookahead
     int stopAtStep = -1;  // for testing purposes: abandon search at this step number
     boolean knuthCompatible = true;
-    private enum Trace {STEP, SEARCH, BIMP, SCORE, FIXING, FOREST}
-    EnumSet<Trace> tracing = EnumSet.noneOf(Trace.class);
+    private enum Trace {STEP, SEARCH, LOOKAHEAD, BIMP, SCORE, FIXING, FOREST}
+    EnumSet<Trace> tracing = /* EnumSet.noneOf(Trace.class) */ EnumSet.of(Trace.SEARCH);
     AlgorithmX x = null;
 
     private enum Fixity {
@@ -454,7 +454,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         Fixity f = fixity(l);
                         if (VAL[thevar(l)] >= RT) l = 0;
                         else if (x.H[l] > x.H[l+1]) ++l;
-                        log.trace("The heuristic data indicated the choice of %d", dl(l));
+                        if (tracing.contains(Trace.SEARCH)) log.trace("The heuristic data indicated the choice of %d", dl(l));
                     } else l = 2*VAR[0]+1; // trivial heuristic: deny the first free variable
                     if (l == 0) {
                         log.trace("no branch at level %d", d);
@@ -628,7 +628,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 case 15:  // Backtrack.
                     if (tracing.contains(Trace.SEARCH)) log.trace("Backtracking from level %d", d);
                     if (d == 0) {
-                        log.trace("UNSAT");
+                        log.trace("UNSAT after %d nodes", nodeCount);
                         return Optional.empty();
                     }
                     --d;
@@ -799,7 +799,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
             final double C_max = d == 0 ? C1 : Integer.max(C0, C1/d);  // Eq. (66)
 
-            log.trace("C_max = %g", C_max);
+            if (tracing.contains(Trace.SCORE)) log.trace("C_max = %g", C_max);
 
             // While C > 2 C_max, delete all elements of CAND whose rating
             // is less than the mean rating; but terminate the loop if no elements are
@@ -1024,7 +1024,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         l = look[j].literal.id;
                         T = BASE + look[j].offset;
                         H[l] = lit[l].parent != null ? H[lit[l].parent.id] : 0;
-                        log.trace("state 6 considers: %d @%d H=%.4g j=%d f=%s", dl(l), T, H[l], j, fixity(l));
+                        if (tracing.contains(Trace.LOOKAHEAD)) log.trace("state 6 considers: %d @%d H=%.4g j=%d f=%s", dl(l), T, H[l], j, fixity(l));
 
                         Fixity f = fixity(l);
                         if (f == Fixity.UNFIXED) {
@@ -1040,7 +1040,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     }
                     /* fall through */
                     case 7:  // [Move to next.]
-                        log.trace("state 7 with FORCE.size = %d", FORCE.size());
                         // System.out.printf("now state 7\n");
                         if (FORCE.size() > Up) {
                             Up = FORCE.size();
@@ -1051,18 +1050,14 @@ public class SATAlgorithmL extends AbstractSATSolver {
                             j = 0;
                             BASE += 2 * S;
                         }
-                        if (j == jp || j == 0 && BASE + 2 * S >= PT) {
-                            log.trace("through looking ahead because we ran out of things");
-                            return true;
-                        }
-                        xstate = 6;
-                        continue;
+                        if (j == jp || j == 0 && BASE + 2 * S >= PT) return true;
+                        xstate = 6; continue;
                     case 8: { // [Compute sharper heuristic.]
                         //System.out.printf("now state 8...\n");
                         if (!Perform72()) { xstate = 13; continue; }
                         // Then...
                         if (w > 0) {
-                            log.trace("After P72() we have w = %.4g", w);
+                            if (tracing.contains(Trace.SCORE)) log.trace("After P72() we have w = %.4g", w);
                             H[l0] += w;
                             xstate = 10;
                             continue;
@@ -1070,14 +1065,14 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     }
                     case 9:  // [Exploit an autarky.]
                         if (H[l0] == 0) {
-                            log.trace("autarky (a) at %d\n", dl(l0));
+                            if (tracing.contains(Trace.LOOKAHEAD)) log.trace("autarky (a) at %d\n", dl(l0));
                             if (!X12(l0)) {
                                 xstate = 13;
                                 continue;
                             }
                         } else {
                             // TODO: change l0 to a Literal, or at least cache the value of lit[l0]
-                            log.trace("autarky (b) at %s", lit[l0]);
+                            if (tracing.contains(Trace.SEARCH)) log.trace("autarky (b) at %s", lit[l0]);
                             // Generate the binary clause l0 | ~PARENT(l0)
                             appendToBimp(not(l0), not(lit[l0].parent.id));
                             appendToBimp(lit[l0].parent.id, l0);
@@ -1093,7 +1088,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         xstate = 7;
                         continue;
                     case 13:  // [Recover from conflict.]
-                        log.trace("lookahead conflict at %s", lit[l0]);
+                        if (tracing.contains(Trace.LOOKAHEAD)) log.trace("lookahead conflict at %s", lit[l0]);
                         if (T < PT) {
                             l = not(l0);
                             if (!X12(l)) {
@@ -1127,19 +1122,19 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     Fixity fu = fixity(u), fv = fixity(v);
                     if (fu == Fixity.FIXED_T || fv == Fixity.FIXED_T) continue;
                     if (fu == Fixity.FIXED_F && fv == Fixity.FIXED_F) {
-                        log.trace("P72 contradiction: both fixed false");
+                        if (tracing.contains(Trace.FIXING)) log.trace("P72 contradiction: both fixed false");
                         return false;
                     }
                     if (fu == Fixity.FIXED_F && fv == Fixity.UNFIXED) {
                         if (!propagate(v)) {
-                            log.trace("P72 contradiction: failed to propagate %s", lit[v]);
+                            if (tracing.contains(Trace.FIXING)) log.trace("P72 contradiction: failed to propagate %s", lit[v]);
                             return false;
                         }
                         W.add(v);
                     }
                     else if (fu == Fixity.UNFIXED && fv == Fixity.FIXED_F) {
                         if (!propagate(u)) {
-                            log.trace("P72 contradiction: failed to propagate %s", lit[u]);
+                            if (tracing.contains(Trace.FIXING)) log.trace("P72 contradiction: failed to propagate %s", lit[u]);
                             return false;
                         }
                         W.add(u);
@@ -1160,7 +1155,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         }
 
         boolean X12(int l) {
-            log.trace("forcing %d", dl(l));
+            if (tracing.contains(Trace.FIXING)) log.trace("forcing %d", dl(l));
             FORCE.add(l);
             int oldT = T;
             T = PT;
