@@ -74,6 +74,11 @@ public class SATAlgorithmLTest extends TestProblems {
         assertThat(a.solve(), isEmpty());
     }
 
+    /* @Test  */ public void rand_3_1062_250_314159() {
+        SATAlgorithmL a = new SATAlgorithmL(SATProblem.randomInstance(3, 1062, 250, 314159));
+        a.useX = true;
+        assertThat(a.solve(), isEmpty());
+    }
 
     @Test
     public void aX2() {
