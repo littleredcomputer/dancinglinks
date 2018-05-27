@@ -26,6 +26,7 @@ public class Main {
         return new Options()
                 .addOption("task", true, "type of problem to solve")
                 .addOption("problem", true, "filename of problem description")
+                .addOption("format", true, "format of problem file")
                 .addOption("board", true, "sudoku board [1-9.]{81}")
                 .addOption("width", true, "width")
                 .addOption("height", true, "height")
@@ -34,9 +35,18 @@ public class Main {
     }
 
     private static Reader problem(CommandLine cmd) throws FileNotFoundException {
-        if (!cmd.hasOption("problem")) throw new IllegalArgumentException("Must specify --problem");
+        if (!cmd.hasOption("problem")) throw new IllegalArgumentException("Must specify -problem");
         String p = cmd.getOptionValue("problem");
         return new BufferedReader(p.equals("-") ? new InputStreamReader(System.in) : new FileReader(p));
+    }
+
+    private static SATProblem satProblem(CommandLine cmd) throws FileNotFoundException {
+        Reader r = problem(cmd);
+        switch (cmd.getOptionValue("format", "cnf")) {
+            case "cnf": return SATProblem.parseFrom(r);
+            case "knuth": return SATProblem.parseKnuth(r);
+            default: throw new IllegalArgumentException("unknown problem format");
+        }
     }
 
     private static Function<SATProblem, AbstractSATSolver> solver(CommandLine cmd) {
@@ -76,7 +86,7 @@ public class Main {
 
     public static void main(String[] args) throws ParseException, FileNotFoundException {
         CommandLine cmd = new DefaultParser().parse(options(), args);
-        if (!cmd.hasOption("task")) throw new IllegalArgumentException("Must specify --task");
+        if (!cmd.hasOption("task")) throw new IllegalArgumentException("Must specify -task");
         String task = cmd.getOptionValue("task");
         switch (task) {
             case "exactcover": {
@@ -141,6 +151,18 @@ public class Main {
                     System.out.println("0");
                 } else {
                     System.out.println("s UNSATISFIABLE");
+                }
+                break;
+            }
+            case "to3sat": {
+                SATProblem p = satProblem(cmd).to3SAT();
+                System.out.println("~~ " + Joiner.on(" ").join(args));
+                for (int i = 0; i < p.nClauses(); ++i) {
+                    List<Integer> c = p.getClause(i);
+                    for (int l : c) {
+                        System.out.printf("%s%d ", l < 0 ? "~": "", Math.abs(l));
+                    }
+                    System.out.println();
                 }
                 break;
             }

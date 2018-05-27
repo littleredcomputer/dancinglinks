@@ -175,4 +175,6 @@ class TestProblems {
     void testQuinnWith(Function<SATProblem, AbstractSATSolver> a) { assertSAT(quinn, a); }
     void testEx6With(Function<SATProblem, AbstractSATSolver> a) { assertUNSAT(ex6, a); }
     void testEx7With(Function<SATProblem, AbstractSATSolver> a) { assertSAT(ex7, a); }
+    void testRand3_1061With(Function<SATProblem, AbstractSATSolver> a) { assertSAT(rand3_1061, a); }
+    void testRand3_1062With(Function<SATProblem, AbstractSATSolver> a) { assertUNSAT(rand3_1062, a); }
 }

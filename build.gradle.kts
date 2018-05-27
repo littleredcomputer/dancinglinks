@@ -8,6 +8,7 @@ plugins {
 
 application {
     mainClassName = "net.littleredcomputer.knuth7.Main"
+
 }
 
 repositories {
