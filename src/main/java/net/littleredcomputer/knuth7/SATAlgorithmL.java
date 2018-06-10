@@ -19,6 +19,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         int SIG = 0;  // binary signature discussed in the solution to F6 Exercise 149
         int SIGL = Integer.MAX_VALUE;  // "infinitely long:" cannot be a prefix of any actual branch history
         // TODO: hook up variable names with a method here when the SAT problem was supplied in knuth format.
+        float rating;
     }
 
     static class Literal {
@@ -109,7 +110,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     int stopAtStep = -1;  // for testing purposes: abandon search at this step number
     boolean knuthCompatible = true;
     private enum Trace {STEP, SEARCH, LOOKAHEAD, BIMP, SCORE, FIXING, FOREST}
-    EnumSet<Trace> tracing = /* EnumSet.noneOf(Trace.class) */ EnumSet.of(Trace.SEARCH);
+    EnumSet<Trace> tracing = /* EnumSet.noneOf(Trace.class) */ EnumSet.of(Trace.SEARCH, Trace.SCORE);
     AlgorithmX x = null;
 
     private enum Fixity {
@@ -676,35 +677,86 @@ public class SATAlgorithmL extends AbstractSATSolver {
         private final TIntArrayList CAND = new TIntArrayList();  // candidate variables for algorithm X
         private final int[] CANDL;  // candidate literals for algorithm X
 
-        final double alpha = 3.5;
-        final double THETA = 20.0;
+        final float alpha = 3.5f;
+        final float THETA = 20.0f;
         final int C0 = 30, C1 = 600;  // See Ex. 148
         final int nVariables;
         private int l0 = 0;  // Current lookahead literal (used in algorithm X)
         int S;  // number of candidate literals
         double w = 0.0;  // Current weight of lookahead choice. TODO it is dodgy that this is an instance variable...
-        final double[][] h;  // h[d][l] is the h-score ("rough heuristic") of literal l at depth d
+        final float[][] h;  // h[d][l] is the h-score ("rough heuristic") of literal l at depth d
         private final double[] H;  // H[l] is the "more discriminating" score for literal l at the current depth (Eq. 67)
-        private final double[] r;  // r[x] is the "rating" of variable x in step X3 (one-based)
 
         AlgorithmX() {
             nVariables = problem.nVariables();
-            h = new double[nVariables+1][];
+            h = new float[nVariables+1][];
             H = new double[2 * nVariables + 2];
-            r = new double[nVariables + 1];
             CANDL = new int[2*nVariables];
         }
 
-        double[] computeHeuristics() {
+        float[] computeHeuristics() {
             final int N = nVariables - F;
-            double[] hd = h[d];
 
-            if (hd == null) {
-                h[d] = hd = new double[2*nVariables+2];
-                if (d <= 1) Arrays.fill(hd, 1);
-                else System.arraycopy(h[d-1], 0, hd, 0, hd.length);
+            if (h[d] == null) {
+                h[d] = new float[2*nVariables+2];
             }
+            if (d <= 1) Arrays.fill(h[d], 1);
+            else System.arraycopy(h[d-1], 0, h[d], 0, h[d].length);
+            float[] hd = h[d];
+            int nCycles = d <= 1 ? 5 : 1;
 
+            // Step X1 is performed before this routine is called.
+            // Step X2: Compile rough heuristics.
+            float sum, tsum, factor, sqfactor, afactor;
+
+            for (int k = 0; k < nCycles; ++k) {
+                sum = 0;
+                for (int i = 0; i < N; ++i) {
+                    final int vi = VAR[i];
+                    sum += hd[poslit(vi)] + hd[neglit(vi)];
+                }
+                factor = 2f*N/sum;
+                sqfactor = factor*factor;
+                afactor = alpha*factor;
+                // TODO: this allocation needs to be killed; use Knuth's technique of alternating between two static arrays.
+                float[] hprime = new float[hd.length];
+                for (int i = 0; i < N; ++i) {
+                    final int vi = VAR[i];
+                    for (int l = 2*vi; l <= 2*vi+1; ++l) {
+                        int bcount = 0, tcount = 0;  // XXX
+                        sum = 0;
+                        // for all u in BIMP[l] with u not fixed
+                        TIntArrayList bimpl = lit[l].BIMP;
+                        float hs = 0;
+                        for (int j = 0; j < lit[l].BSIZE; ++j) {
+                            final int u = bimpl.getQuick(j);  // TODO: name, type
+                            if (isfree(u)) {++bcount; sum += hd[u];}
+                        }
+                        tsum = 0;
+                        for (int p = lit[l].TIMP, j = 0; j < lit[l].TSIZE; p = NEXT.get(p), ++j) {
+                            tsum += hd[U.getQuick(p)] * hd[V.getQuick(p)];
+                            ++tcount;
+                        }
+                        sum = 0.1f+sum*afactor+tsum*sqfactor;
+                        if (l >= 6 && l <= 12) log.trace("L=%d sum=%.6f b%d/t%d TSIZE=%d", l, sum, bcount, tcount, lit[l].TSIZE);
+                        hprime[l] = Float.min(THETA, sum);
+                        // if (tracing.contains(Trace.SCORE)) log.trace("h[%s] = %.4f", lit[l], hprime[l]);
+                    }
+                }
+                System.arraycopy(hprime, 2, hd, 2, 2*nVariables);
+            }
+            return hd;
+        }
+
+        float[] computeHeuristicsORIG() {
+            final int N = nVariables - F;
+
+            if (h[d] == null) {
+                h[d] = new float[2*nVariables+2];
+                if (d <= 1) Arrays.fill(h[d], 1);
+                else System.arraycopy(h[d-1], 0, h[d], 0, h[d].length);
+            }
+            float[] hd = h[d];
             int nCycles = d <= 1 ? 5 : 1;
 
             // Step X1 is performed before this routine is called.
@@ -718,21 +770,29 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 hAve /= 2.0 * N;
                 final double hAve2 = hAve * hAve;
                 // TODO: this allocation needs to be killed; use Knuth's technique of alternating between two static arrays.
-                double[] hprime = new double[hd.length];
+                float[] hprime = new float[hd.length];
                 for (int i = 0; i < N; ++i) {
                     final int vi = VAR[i];
                     for (int l = 2*vi; l <= 2*vi+1; ++l) {
                         // update hd[l]
-                        double hp = 0.1;
+                        float hp = 0.1f;
                         // for all u in BIMP[l] with u not fixed
                         TIntArrayList bimpl = lit[l].BIMP;
-                        double hs = 0;
-                        for (int j = 0; j < lit[l].BSIZE; ++j) hs += hd[bimpl.get(j)] / hAve;
-                        hp += alpha * hs;
-                        for (int p = lit[l].TIMP, j = 0; j < lit[l].TSIZE; p = NEXT.get(p), ++j) {
-                            hp += hd[U.get(p)] * hd[V.get(p)] / hAve2;
+                        float hs = 0;
+                        for (int j = 0; j < lit[l].BSIZE; ++j) {
+                            final int lit = bimpl.getQuick(j);  // TODO: name, type
+                            if (VAL[thevar(lit)] < RT) {
+                                hs += hd[lit];
+                            }
                         }
-                        hprime[l] = hp > THETA ? THETA : hp;
+                        hp += alpha * hs / hAve;
+                        hs = 0;
+                        for (int p = lit[l].TIMP, j = 0; j < lit[l].TSIZE; p = NEXT.get(p), ++j) {
+                            hs += hd[U.get(p)] * hd[V.get(p)];
+                        }
+                        hp += hs / hAve2;
+                        hprime[l] = Float.min(THETA, hp);
+                        // if (tracing.contains(Trace.SCORE)) log.trace("h[%s] = %.4f", lit[l], hprime[l]);
                     }
                 }
                 System.arraycopy(hprime, 2, hd, 2, 2*nVariables);
@@ -776,7 +836,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 return true;
             }
             final int N = nVariables - F;
-            final double[] hd = computeHeuristics();
+            final float[] hd = computeHeuristics();
             // Step X3: Preselect candidates.
             // First select all free participants.
 
@@ -813,23 +873,32 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 selectCandidates(false);
             }
 
-            // Give each variable x in CAND the rating r(x) = h(x)h(¬x)
-            double r_sum = 0.;
-            for (int i = 0; i < CAND.size(); ++i) {
-                final int v = CAND.get(i);
-                r[v] = hd[2*v] * hd[2*v+1];
-                if (tracing.contains(Trace.SCORE)) log.trace("Rating(%d) = %g", v, r[v]);
-                r_sum += r[v];
+            // Give each free variable the rating h(x)h(¬x)
+            for (int i = 0; i < N; ++i) {
+                final int v = VAR[i];
+                var[v].rating = hd[poslit(v)] * hd[neglit(v)];
             }
 
+            if (tracing.contains(Trace.SCORE)) {
+                for (int v = 0; v < nVariables; ++v) {
+                    log.trace("rating[%9d] = %8.4f   == %8.4f * %8.4f", v, var[v].rating, hd[poslit(v)], hd[neglit(v)]);
+                }
+            }
 
             final double C_max = d == 0 ? C1 : Integer.max(C0, C1/d);  // Eq. (66)
 
             if (tracing.contains(Trace.SCORE)) log.trace("C_max = %g", C_max);
 
+            double r_sum = 0.;
+            for (int i = 0; i < CAND.size(); ++i) {
+                r_sum += var[CAND.get(i)].rating;
+            }
+
             // While C > 2 C_max, delete all elements of CAND whose rating
             // is less than the mean rating; but terminate the loop if no elements are
             // actually deleted.
+
+
 
             while (CAND.size() > 2 * C_max) {
                 // Compute the mean score.
@@ -838,7 +907,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 int back = CAND.size();
                 r_sum = 0.0;
                 for (int i = 0; i < back; ) {
-                    final double score = r[CAND.get(i)];
+                    final double score = var[CAND.get(i)].rating;
                     if (score < r_mean) {
                         // This is a bad one. Pull a new one from the end of the candidates list.
                         CAND.set(i, CAND.getQuick(--back));
@@ -855,8 +924,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
             // candidates.
             if (CAND.size() > C_max) {
                 // Here's an allocation. Maybe we want to put heapification under
-                // user control. Can we also close over r[] that way... XXX
-                IntHeap h = new IntHeap(CAND, (v,w) -> Double.compare(r[w], r[v]));
+                // user control. Can we also close over var[] that way... XXX
+                IntHeap h = new IntHeap(CAND, (v,w) -> Double.compare(var[w].rating, var[v].rating));
                 while (CAND.size() > C_max) h.pop();
             }
 
@@ -869,10 +938,17 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     final Literal l = lit[candlit];
                     l.bstamp = BSTAMP;
                     l.arcs.resetQuick();
-                    for (int j = l.TIMP, k = 0; k < l.TSIZE; j = NEXT.getQuick(j), ++k) {
-                        //System.out.printf("%d => %d and %d\n", dl(l), dl(U.getQuick(j)), dl(V.getQuick(j)));
-                        H[candlit] += hd[U.getQuick(j)] * hd[V.getQuick(j)];
-                    }
+//                    for (int j = l.TIMP, k = 0; k < l.TSIZE; j = NEXT.getQuick(j), ++k) {
+//                        //System.out.printf("%d => %d and %d\n", dl(l), dl(U.getQuick(j)), dl(V.getQuick(j)));
+//                        // WHERE WE LEFT OFF:
+//                        // I have the weird sensation this is being done twice for some reason.
+//                        // It's almost as if H is being conflated with something else, or we haven't
+//                        // read the doc attentively enough.
+//
+//                        // QQ: if not for this, would the numbers add up?
+//
+//                        H[candlit] += hd[U.getQuick(j)] * hd[V.getQuick(j)];
+//                    }
                 }
             }
             S = 0;
@@ -928,7 +1004,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
             for (int i = 0; i < S; ++i) {
                 final Literal l = lit[CANDL[i]];
                 // TODO: consider equipping literals with a pointer to their variable parents
-                if (l != l.parent && r[thevar(l.id)] > r[thevar(l.parent.vcomp.id)]) {
+                if (l != l.parent && var[thevar(l.id)].rating > var[thevar(l.parent.vcomp.id)].rating) {
                     l.parent.vcomp = l;
                 }
                 if (l.id == not(l.parent.id)) {
@@ -942,9 +1018,9 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 for (Literal s = cc.settled(); s != null; s = s.link) {
                     final Literal t = s;
                     log.trace(() -> {
-                        StringBuilder sb = new StringBuilder(String.format(" %d %.4g", dl(t.id), r[thevar(t.id)]));
+                        StringBuilder sb = new StringBuilder(String.format(" %d %.4g", dl(t.id), var[thevar(t.id)].rating));
                         if (t.parent != t) sb.append(" with ").append(dl(t.parent.id));
-                        else if (t.vcomp != t) sb.append("-> ").append(dl(t.vcomp.id)).append(String.format(" %.4g", r[t.vcomp.id >> 1]));
+                        else if (t.vcomp != t) sb.append("-> ").append(dl(t.vcomp.id)).append(String.format(" %.4g", var[t.vcomp.id >> 1].rating));
                         return sb.toString();
                     });
                 }
@@ -1052,8 +1128,13 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 //System.out.printf("X in state %d. j = %d\n", xstate, j);
                 switch (xstate) {
                     case 6: { // [Choose l for lookahead.]
+                        // TODO: start fixing type here
                         l = look[j].literal.id;
                         T = BASE + look[j].offset;
+                        if (lit[l].parent != null) {
+                            log.trace("WNB for %s is being inherited from parent %s: %.4f overwrites %.4f", lit[l], lit[l].parent, H[lit[l].parent.id], H[l]);
+                            H[l] = H[lit[l].parent.id];
+                        }
                         H[l] = lit[l].parent != null ? H[lit[l].parent.id] : 0;
                         if (tracing.contains(Trace.LOOKAHEAD)) log.trace("state 6 considers: %d @%d H=%.4g j=%d f=%s", dl(l), T, H[l], j, fixity(l));
 
@@ -1088,8 +1169,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         if (!Perform72()) { xstate = 13; continue; }
                         // Then...
                         if (w > 0) {
-                            if (tracing.contains(Trace.SCORE)) log.trace("After P72() we have w = %.4g", w);
                             H[l0] += w;
+                            log.trace("** now H[%s] = %.4f after adding %.4f", lit[l0], H[l0], w);
                             xstate = 10;
                             continue;
                         }
@@ -1173,6 +1254,11 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     else {
                         assert fu == Fixity.UNFIXED && fv == Fixity.UNFIXED;
                         w += h[d][u] * h[d][v];
+                        log.trace("WNB += [%s:]%.4f * [%s:]%.4f = %.4f ---> %.4f",
+                                lit[u], h[d][u],
+                                lit[v], h[d][v],
+                                h[d][u]*h[d][v],
+                                w);
                     }
                 }
                 // generate new binary clauses (lbar_0 | w) for w in W.
@@ -1204,4 +1290,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         if (t >= PT) return "proto";
         return Integer.toString(t);
     }
+
+    // TODO: fix type etc.
+    private boolean isfree(int lit) { return VAL[thevar(lit)] < RT; }
 }
