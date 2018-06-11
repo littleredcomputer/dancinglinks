@@ -26,24 +26,20 @@ public class SATProblem {
         this.nVariables = nVariables;
     }
 
-    public int nClauses() {
+    int nClauses() {
         return clauses.size();
     }
+    List<List<Integer>> encodedClauses() { return Collections.unmodifiableList(clauses); }
 
     public int nVariables() {
         return nVariables;
     }
-
     public int nLiterals() {
         return nLiterals;
     }
 
-    public int height() {
+    int height() {
         return height;
-    }
-
-    List<Integer> getEncodedClause(int i) {
-        return clauses.get(i);
     }
 
     List<Integer> getClause(int i) {

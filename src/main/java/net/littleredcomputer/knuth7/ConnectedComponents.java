@@ -12,27 +12,20 @@ class ConnectedComponents {
     // and so we would like to reuse the data already allocated to the literals in the computation of
     // the connected components.
 
-    private final SATAlgorithmL.Literal[] vertices;
-
     private SATAlgorithmL.Literal activeStack = null;
     private SATAlgorithmL.Literal settledStack = null;
     private int nn = 0;
 
-    ConnectedComponents(SATAlgorithmL.Literal[] vertices) {
-        this.vertices = vertices;
-    }
-
     SATAlgorithmL.Literal settled() { return settledStack; }
 
-    void find(int[] view, int viewLength) {
+    void find(SATAlgorithmL.Literal[] view, int viewLength) {
         for (int i = 0; i < viewLength; ++i) {
-            SATAlgorithmL.Literal l = vertices[view[i]];
+            final SATAlgorithmL.Literal l = view[i];
             l.rank = 0;
             l.untagged = 0;
         }
         for (int i = 0; i < viewLength; ++i) {
-            SATAlgorithmL.Literal l = vertices[view[i]];
-            if (l.rank == 0) process(l);
+            if (view[i].rank == 0) process(view[i]);
         }
     }
 
@@ -57,7 +50,7 @@ class ConnectedComponents {
                 // XXX where we left off: this doesn't work. At some points, we need to
                 // index over literals (from the cand array), but other times, we want data
                 // from the literal table.
-                u = vertices[v.arcs.getQuick(v.untagged)];  // u = the tip of the untagged arc from v
+                u = v.arcs.get(v.untagged);  // u = the tip of the untagged arc from v
                 ++v.untagged;
                 if (u.rank != 0) {  // We've seen u already
                     if (u.rank < v.min.rank) v.min = u;  // non-tree arc, just update v.min

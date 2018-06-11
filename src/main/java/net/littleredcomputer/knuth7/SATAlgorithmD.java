@@ -14,20 +14,22 @@ public class SATAlgorithmD extends AbstractSATSolver {
     public Optional<boolean[]> solve() {
         start();
         final int nVariables = problem.nVariables();
+        final List<List<Integer>> clauses = problem.encodedClauses();
+        final int nClauses = clauses.size();
         int[] m = new int[nVariables + 1];
         int[] x = new int[nVariables + 1];
         int[] H = new int[nVariables + 1];
         int[] NEXT = new int[nVariables + 1];
         int[] W = new int[2 * nVariables + 2];
         int[] L = new int[problem.nLiterals()];
-        int[] LINK = new int[problem.nClauses() + 1];
-        int[] START = new int[problem.nClauses() + 1];
+        int[] LINK = new int[nClauses + 1];
+        int[] START = new int[nClauses + 1];
         int d = 0;
         int h = 0;
         int t = 0;
         int c = 0;
-        for (int ciz = problem.nClauses() - 1; ciz >= 0; --ciz) {
-            List<Integer> clause = problem.getEncodedClause(ciz);
+        for (int ciz = nClauses - 1; ciz >= 0; --ciz) {
+            List<Integer> clause = clauses.get(ciz);
             START[ciz+1] = c;
             LINK[ciz+1] = W[clause.get(0)];
             W[clause.get(0)] = ciz+1;

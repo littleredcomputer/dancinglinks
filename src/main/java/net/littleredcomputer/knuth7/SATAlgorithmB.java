@@ -12,7 +12,8 @@ public class SATAlgorithmB extends AbstractSATSolver {
     public Optional<boolean[]> solve() {
         start();
         final int nVariables = problem.nVariables();
-        final int nClauses = problem.nClauses();
+        final List<List<Integer>> clauses = problem.encodedClauses();
+        final int nClauses = clauses.size();
         int[] m = new int[nVariables + 1];
         int[] START = new int[nClauses + 1];
         int[] L = new int[problem.nLiterals()];
@@ -21,7 +22,7 @@ public class SATAlgorithmB extends AbstractSATSolver {
 
         int c = 0;
         for (int ciz = nClauses - 1; ciz >= 0; --ciz) {
-            List<Integer> clause = problem.getEncodedClause(ciz);
+            final List<Integer> clause = clauses.get(ciz);
             START[ciz+1] = c;
             LINK[ciz+1] = W[clause.get(0)];
             W[clause.get(0)] = ciz+1;
