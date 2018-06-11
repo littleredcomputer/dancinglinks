@@ -12,9 +12,9 @@ class ConnectedComponents {
     // and so we would like to reuse the data already allocated to the literals in the computation of
     // the connected components.
 
-    private SATAlgorithmL.Literal activeStack = null;
-    private SATAlgorithmL.Literal settledStack = null;
-    private int nn = 0;
+    private SATAlgorithmL.Literal activeStack;
+    private SATAlgorithmL.Literal settledStack;
+    private int nn;
 
     SATAlgorithmL.Literal settled() { return settledStack; }
 
@@ -24,6 +24,9 @@ class ConnectedComponents {
             l.rank = 0;
             l.untagged = 0;
         }
+        activeStack = null;
+        settledStack = null;
+        nn = 0;
         for (int i = 0; i < viewLength; ++i) {
             if (view[i].rank == 0) process(view[i]);
         }
