@@ -164,7 +164,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 case 1: {
                     // Put it in the FORCE array, unless it is contradictory
                     final int u = clause.get(0);
-                    if (units.contains(u ^ 1))
+                    if (units.contains(not(u)))
                         throw new IllegalArgumentException("Contradictory unit clauses involving variable " + thevar(u) + " found");
                     units.add(u);
                     break;
@@ -172,8 +172,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 case 2: {
                     // Put it in the BIMP. Choosing v, u in this order produces a Knuth-compatible BIMP table.
                     final int v = clause.get(0), u = clause.get(1);
-                    oBIMP.get(u ^ 1).add(v);
-                    oBIMP.get(v ^ 1).add(u);
+                    oBIMP.get(not(u)).add(v);
+                    oBIMP.get(not(v)).add(u);
                     break;
                 }
                 case 3: {
@@ -194,17 +194,17 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     LINK.add(z + 2);
                     LINK.add(z);
 
-                    NEXT.add(lit[u ^ 1].TIMP);
-                    NEXT.add(lit[v ^ 1].TIMP);
-                    NEXT.add(lit[w ^ 1].TIMP);
+                    NEXT.add(lit[not(u)].TIMP);
+                    NEXT.add(lit[not(v)].TIMP);
+                    NEXT.add(lit[not(w)].TIMP);
 
-                    lit[u ^ 1].TIMP = z;
-                    lit[v ^ 1].TIMP = z + 1;
-                    lit[w ^ 1].TIMP = z + 2;
+                    lit[not(u)].TIMP = z;
+                    lit[not(v)].TIMP = z + 1;
+                    lit[not(w)].TIMP = z + 2;
 
-                    ++lit[u ^ 1].TSIZE;
-                    ++lit[v ^ 1].TSIZE;
-                    ++lit[w ^ 1].TSIZE;
+                    ++lit[not(u)].TSIZE;
+                    ++lit[not(v)].TSIZE;
+                    ++lit[not(w)].TSIZE;
 
                     break;
                 }
@@ -278,9 +278,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
             }
             case UNFIXED:
                 if (tracing.contains(Trace.FIXING)) log.trace("%s%sfixing %d", subordinate ? " " : "", tName(T), l);
-                // TODO: put VAL in the VAR array
                 l.var.VAL = T + (l.id & 1);
-                // TODO: type of R
                 R[E] = l;
                 ++E;
         }
@@ -299,7 +297,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         final int bsize = b.BSIZE;
         if (b.IST != ISTAMP) {
             b.IST = ISTAMP;
-            // TODO: type of ISTACKb
             ISTACKb.push(b);
             ISTACKs.push(bsize);
         }
