@@ -22,6 +22,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         int SIG = 0;  // binary signature discussed in the solution to F6 Exercise 149
         int SIGL = Integer.MAX_VALUE;  // "infinitely long:" cannot be a prefix of any actual branch history
         int VAL;  // current assigned value. The values are drawn from a belief hierarchy and may be "fixed" at different levels.
+        int INX;  // our position in the VAR array
         // TODO: hook up variable names with a method here when the SAT problem was supplied in knuth format.
         float rating;
 
@@ -92,8 +93,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private final Literal[] lit;
     private final Variable[] var;
     private final Lookahead[] look;
-    private final int[] VAR;
-    private final int[] INX;  // INX[v] is the index of variable v in VAR
+    private final Variable[] VAR;
     private final Literal[] DEC;
     private final int[] BACKF;  // backtrack value of F, indexed by depth
     private final int[] BACKI;  // backtrack value of ISTACK size, indexed by depth
@@ -101,7 +101,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private final Literal[] R;  // stack of literals
     // Reading Knuth we might choose to implement ISTACK as a stack of pairs of ints. But that would require boxing.
     // Instead, we implement ISTACK as a pair of stacks of primitive ints.
-    private final TIntStack ISTACKb = new TIntArrayStack();  // stack of literals
+    private final Stack<Literal> ISTACKb = new Stack<>();  // stack of literals
     private final TIntStack ISTACKs = new TIntArrayStack();  // stack of BIMP table sizes for corresponding literals above
     private int T = NT;  // truth degree (F6 7.2.2.2 p. 37)
     private int E = 0;  // literals R[k] are "nearly true" for G <= k < E.
@@ -145,11 +145,10 @@ public class SATAlgorithmL extends AbstractSATSolver {
         }
         look = new Lookahead[literalAllocation];
         Arrays.setAll(look, i -> new Lookahead());
-        VAR = new int[nVariables];
+        VAR = new Variable[nVariables];
         DEC = new Literal[nVariables];
         BACKF = new int[nVariables];
         BACKI = new int[nVariables];
-        INX = new int[nVariables + 1];
         BRANCH = new int[nVariables + 1];
         R = new Literal[nVariables + 1];  // stack to record the names of literals that have received values.
         // A literal and its complement never appear together here, so nVariables is enough space (but: one-based)
@@ -233,14 +232,14 @@ public class SATAlgorithmL extends AbstractSATSolver {
         for (int k = 0; k < nVariables; ++k) {
             final int j = rng.unifRand(k + 1);
             if (j != k) {
-                int i = VAR[j];
+                Variable i = VAR[j];
                 VAR[k] = i;
-                INX[i] = k;
-                VAR[j] = k + 1;
-                INX[k + 1] = j;
+                i.INX = k;
+                VAR[j] = var[k + 1];
+                var[k + 1].INX = j;
             } else {
-                VAR[k] = k + 1;
-                INX[k + 1] = k;
+                VAR[k] = var[k + 1];
+                var[k + 1].INX = k;
             }
         }
         print();
@@ -301,7 +300,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         if (b.IST != ISTAMP) {
             b.IST = ISTAMP;
             // TODO: type of ISTACKb
-            ISTACKb.push(b.id);
+            ISTACKb.push(b);
             ISTACKs.push(bsize);
         }
         List<Literal> bimp = b.BIMP;
@@ -369,7 +368,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     }
 
 
-    private String timpToString(int l) {
+    private String timpToString(int l) {  // TODO: type of l
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("  %3d -> ", dl(l)));
         for (int i = 0, p = lit[l].TIMP; i < lit[l].TSIZE; i++, p = NEXT.get(p)) {
@@ -391,6 +390,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         }
         log.trace("TIMP tables:");
         for (int l = 2; l <= 2 * nVariables + 1; ++l) {
+            // TODO: type of l
             if (lit[l].TSIZE > 0) {
                 log.trace(timpToString(l));
             }
@@ -412,7 +412,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         // TODO: implement the idea of "compensation resolvents"
 
         TIntArrayList buf = new TIntArrayList();
-        int[] waterline = new int[1];
 
         STEP:
         while (true) {
@@ -485,7 +484,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         else if (isfixed(top)) l = null;
                         else if (top.H > top.not.H) l = top.not;
                         else l = top;
-                    } else l = lit[neglit(VAR[0])]; // trivial heuristic: deny the first free variable
+                    } else l = neglit(VAR[0]); // trivial heuristic: deny the first free variable
                     if (l == null) {
                         if (tracing.contains(Trace.STEP))
                             log.trace("no branch at level %d; d becomes %d and going to step 2.", d, d + 1);
@@ -532,21 +531,20 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     if (tracing.contains(Trace.STEP)) log.trace("Promote %s to real truth", L);
 
                     // TODO: fix types here.
-                    int X = L.var.id;
-                    L.var.VAL = RT + (L.id & 1);  // TODO magic number
+                    Variable X = L.var;
+                    X.VAL = RT + (L.id & 1);  // TODO magic number
                     // Remove variable X from the free list and from all TIMP pairs (ex. 137).
                     final int N1 = N - G;
-                    int x = VAR[N1];
-                    int j = INX[X];
+                    Variable x = VAR[N1];
+                    int j = X.INX;
                     VAR[j] = x;
-                    INX[x] = j;
+                    x.INX = j;
                     VAR[N1] = X;
-                    INX[X] = N1;
-                    for (int xlit = 2 * X; xlit <= 2 * X + 1; ++xlit) {
+                    X.INX = N1;
+                    for (int xlit = poslit(X).id; xlit <= neglit(X).id; ++xlit) {
                         for (int p = lit[xlit].TIMP, tcount = 0; tcount < lit[xlit].TSIZE; p = NEXT.get(p), ++tcount) {
                             int u0 = U.get(p);
                             int v = V.get(p);
-                            ++waterline[0];
                             int pp = LINK.get(p);
                             int ppp = LINK.get(pp);
                             int s = lit[not(u0)].TSIZE - 1;
@@ -654,7 +652,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 case 13:  // Downdate BIMPs
                     if (BRANCH[d] >= 0) {
                         while (ISTACKb.size() > BACKI[d]) {
-                            lit[ISTACKb.pop()].BSIZE = ISTACKs.pop();
+                            ISTACKb.pop().BSIZE = ISTACKs.pop();
                         }
                     }
                 case 14:  // Try again?
@@ -730,8 +728,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
             for (int k = 0; k < nCycles; ++k) {
                 sum = 0;
                 for (int i = 0; i < N; ++i) {
-                    final int vi = VAR[i];
-                    sum += hd[poslit(vi)] + hd[neglit(vi)];
+                    final Variable v = VAR[i];
+                    sum += hd[poslit(v).id] + hd[neglit(v).id];
                 }
                 factor = 2f * N / sum;
                 sqfactor = factor * factor;
@@ -739,8 +737,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 // TODO: this allocation needs to be killed; use Knuth's technique of alternating between two static arrays.
                 float[] hprime = new float[hd.length];
                 for (int i = 0; i < N; ++i) {
-                    final int vi = VAR[i];
-                    for (int l = 2 * vi; l <= 2 * vi + 1; ++l) {
+                    final Variable v = VAR[i];
+                    for (int l = poslit(v).id; l <= neglit(v).id; ++l) {
                         int bcount = 0, tcount = 0;  // XXX
                         sum = 0;
                         // for all u in BIMP[l] with u not fixed
@@ -786,16 +784,17 @@ public class SATAlgorithmL extends AbstractSATSolver {
             for (int k = 0; k < nCycles; ++k) {
                 double hAve = 0.0;
                 for (int i = 0; i < N; ++i) {
-                    final int vi = VAR[i];
-                    hAve += hd[poslit(vi)] + hd[neglit(vi)];
+                    final Variable v = VAR[i];
+                    hAve += hd[poslit(v).id] + hd[neglit(v).id];
                 }
                 hAve /= 2.0 * N;
                 final double hAve2 = hAve * hAve;
                 // TODO: this allocation needs to be killed; use Knuth's technique of alternating between two static arrays.
                 float[] hprime = new float[hd.length];
                 for (int i = 0; i < N; ++i) {
-                    final int vi = VAR[i];
-                    for (int l = 2 * vi; l <= 2 * vi + 1; ++l) {
+                    final Variable v = VAR[i];
+                    // TODO: subroutinize the following and unroll this loop.
+                    for (int l = poslit(v).id; l <= neglit(v).id; ++l) {
                         // update hd[l]
                         float hp = 0.1f;
                         // for all u in BIMP[l] with u not fixed
@@ -827,7 +826,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         private void selectCandidates(boolean participantsOnly) {
             CAND.clear();
             for (int i = 0; i < nVariables - F; ++i) {
-                final Variable v = var[VAR[i]];
+                final Variable v = VAR[i];
                 v.VAL = 0;  // erase all former assignments
                 if (participantsOnly) {
                     // Perform the prefix test. Skip to next free variable if it fails.
@@ -869,8 +868,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 boolean sat = true;
                 VARIABLE:
                 for (int vi = 0; vi < nVariables - F; ++vi) {
-                    final int v = VAR[vi];
-                    for (int l = 2 * v; l <= 2 * v + 1; ++l) {
+                    final Variable v = VAR[vi];
+                    for (int l = poslit(v).id; l <= neglit(v).id; ++l) {
                         // l is a free literal since v is a free variable.
                         if (lit[l].TSIZE > 0) {
                             sat = false;
@@ -893,8 +892,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
             // Give each free variable the rating h(x)h(¬x)
             for (int i = 0; i < N; ++i) {
-                final int v = VAR[i];
-                var[v].rating = hd[poslit(v)] * hd[neglit(v)];
+                final Variable v = VAR[i];
+                v.rating = hd[poslit(v).id] * hd[neglit(v).id];
             }
 
             if (tracing.contains(Trace.SCORE)) {
