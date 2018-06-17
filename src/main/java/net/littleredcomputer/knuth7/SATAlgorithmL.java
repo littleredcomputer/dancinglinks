@@ -44,7 +44,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         List<Literal> BIMP;
 
         // auxiliary data for Tarjan's algorithm
-        long bstamp;  // bstamp value identifies current generation of candidates
+        long bstamp = 0;  // bstamp value identifies current generation of candidates
         int rank;
         Literal parent;  // points to the parent of this vertex (which is another vertex or Λ.
         Literal vcomp;  // for component representatives: the component member of maximum rating
@@ -92,7 +92,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private final List<Literal> FORCE = new ArrayList<>();
     private final Literal[] lit;
     private final Variable[] var;
-    private final Lookahead[] look;
     private final Variable[] VAR;
     private final Literal[] DEC;
     private final int[] BACKF;  // backtrack value of F, indexed by depth
@@ -122,7 +121,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
     private enum Trace {STEP, SEARCH, LOOKAHEAD, BIMP, SCORE, FIXING, FOREST}
 
-    EnumSet<Trace> tracing = /* EnumSet.noneOf(Trace.class) */ EnumSet.of(Trace.SEARCH, Trace.SCORE, Trace.FOREST, Trace.BIMP);
+    EnumSet<Trace> tracing = /* EnumSet.noneOf(Trace.class) */ EnumSet.of(Trace.FOREST, Trace.SEARCH, Trace.FIXING);
     AlgorithmX x = null;
 
     private enum Fixity {
@@ -143,8 +142,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
             lit[i].not = lit[not(i)];
             lit[i].var = var[thevar(i)];
         }
-        look = new Lookahead[literalAllocation];
-        Arrays.setAll(look, i -> new Lookahead());
         VAR = new Variable[nVariables];
         DEC = new Literal[nVariables];
         BACKF = new int[nVariables];
@@ -257,7 +254,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         }
         for (; H < E; ++H) {
             List<Literal> bimpl = R[H].BIMP;
-            // TODO: type of R
             for (int i = 0; i < R[H].BSIZE; ++i) {
                 if (!takeAccountOf(bimpl.get(i), true)) return false;
             }
@@ -277,7 +273,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 return /* conflict */ false;
             }
             case UNFIXED:
-                if (tracing.contains(Trace.FIXING)) log.trace("%s%sfixing %d", subordinate ? " " : "", tName(T), l);
+                if (tracing.contains(Trace.FIXING)) log.trace("%s%sfixing %s", subordinate ? " " : "", tName(T), l);
                 l.var.VAL = T + (l.id & 1);
                 R[E++] = l;
         }
@@ -365,7 +361,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
             /* "...but goto fix_u if u is forced true" */
             if (!addCompensationResolventsFrom(u, v)) return propagate(u);
             ++BSTAMP;
-            v.not.bstamp = BSTAMP;
+            vbar.bstamp = BSTAMP;
             for (int i = 0; i < vbar.BSIZE; ++i) vbar.BIMP.get(i).bstamp = BSTAMP;
             if (ubar.bstamp == BSTAMP) {
                 /* we already have ~u | v */
@@ -396,7 +392,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     return false; /* goto fix_u or fix_v */
                 }
                 if (w.bstamp != BSTAMP) { /* u | w is new */
-                    if (tracing.contains(Trace.BIMP)) log.trace(" K -> %s|%s", u, w);
+                    if (tracing.contains(Trace.FIXING)) log.trace(" K -> %s|%s", u, w);
                     appendToBimp(u.not, w); /* ~u => w */
                     appendToBimp(w.not, u); /* ~w => u */
                 }
@@ -407,24 +403,24 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
     /* Returns the fixity of l in the context T */
     private Fixity fixity(Literal l) {
-        // TODO: want something like l.var.VAL
         int val = l.var.VAL;
-        if (val < T) return Fixity.UNFIXED;
+        if (val < T) return Fixity.UNFIXED;  // TODO: consider changing this to if (unfixed(l))?
         return negated(val) == negated(l.id) ? Fixity.FIXED_T : Fixity.FIXED_F;
     }
 
 
-    private String timpToString(Literal l) {  // TODO: type of l
+    private String timpToString(Literal l) {
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("  %3s -> ", l));
         for (int i = 0, p = l.TIMP; i < l.TSIZE; i++, p = NEXT.get(p)) {
-            sb.append(dl(U.get(p))).append('|').append(dl(V.get(p))).append(' ');
+            sb.append(lit[U.get(p)]).append('|').append(lit[V.get(p)]).append(' ');
         }
         return sb.toString();
     }
 
     private void print() {
         final int nVariables = problem.nVariables();
+        final boolean withExcess = false;
         log.trace("BIMP tables:");
         for (int i = 1; i < lit.length; ++i) {
             final Literal l = lit[i];
@@ -434,7 +430,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 log.trace("  %3s: %s %s",
                         l,
                         l.BIMP.stream().limit(bsize).map(Literal::toString).collect(Collectors.joining(" ")),
-                        l.BSIZE < l.BIMP.size() ? String.format("(+%d)", l.BIMP.size() - l.BSIZE) : "");
+                        withExcess && (l.BSIZE < l.BIMP.size()) ? String.format("(+%d)", l.BIMP.size() - l.BSIZE) : "");
             }
         }
         log.trace("TIMP tables:");
@@ -457,8 +453,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         }
         start();
         final int N = VAR.length;
-
-        // TODO: implement the idea of "compensation resolvents"
 
         TIntArrayList buf = new TIntArrayList();
 
@@ -519,7 +513,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         double maxz = 0;
                         Literal top = null;
                         for (int i = 0; i < x.S; ++i) {
-                            Literal cl = look[i].literal;
+                            Literal cl = x.look[i].literal;
                             if (negated(cl.id)) continue;
                             double z = (cl.H + 0.1) * (cl.not.H  + 0.1);
                             if (tracing.contains(Trace.SCORE))
@@ -577,9 +571,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     Literal L = R[G];
                     ++G;
                     // case 7:  Promote L to real truth.
-                    if (tracing.contains(Trace.STEP)) log.trace("Promote %s to real truth", L);
+                    if (tracing.contains(Trace.FIXING)) log.trace("fixing %s", L);
 
-                    // TODO: fix types here.
                     Variable X = L.var;
                     X.VAL = RT + (L.id & 1);  // TODO magic number
                     // Remove variable X from the free list and from all TIMP pairs (ex. 137).
@@ -646,7 +639,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     for (int p = L.TIMP, tcount = 0; tcount < L.TSIZE; p = NEXT.get(p), ++tcount) {
                         // TODO: type of U, V
                         final int u = U.get(p), v = V.get(p);
-                        if (tracing.contains(Trace.FIXING)) log.trace("  %s->%s|%s", L, u, v);
+                        if (tracing.contains(Trace.FIXING)) log.trace("  %s->%s|%s", L, lit[u], lit[v]);
                         makeParticipants(lit[u].var, lit[v].var);
                         if (!consider(lit[u], lit[v])) {
                             state = 11;
@@ -743,21 +736,24 @@ public class SATAlgorithmL extends AbstractSATSolver {
      */
     class AlgorithmX {
         private final ArrayList<Variable> CAND = new ArrayList<>();  // candidate variables for algorithm X
-        private final Literal[] CANDL;  // candidate literals for algorithm X
+        private final ArrayList<Literal> CANDL = new ArrayList<>();  // candidate literals
+        private final Lookahead[] look;  // lookahead entries
+        int S;  // number of valid look[] entries
 
         final float alpha = 3.5f;
         final float THETA = 20.0f;
         final int C0 = 30, C1 = 600;  // See Ex. 148
         final int nVariables;
         private Literal l0;  // Current lookahead literal (used in algorithm X)
-        int S;  // number of candidate literals
         private double w = 0.0;  // Current weight of lookahead choice. TODO it is dodgy that this is an instance variable...
         private final float[][] h;  // h[d][l] is the h-score ("rough heuristic") of literal l at depth d
+        private final Heap<Variable> candidateHeap = new Heap<>();
 
         AlgorithmX() {
             nVariables = problem.nVariables();
             h = new float[nVariables + 1][];
-            CANDL = new Literal[2 * nVariables];
+            look = new Lookahead[2*nVariables];
+            Arrays.setAll(look, i -> new Lookahead());
         }
 
         float[] computeHeuristics() {
@@ -794,7 +790,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         // for all u in BIMP[l] with u not fixed
                         List<Literal> bimpl = lit[l].BIMP;
                         for (int j = 0; j < lit[l].BSIZE; ++j) {
-                            final Literal u = bimpl.get(j);  // TODO: name, type
+                            final Literal u = bimpl.get(j);
                             if (isfree(u)) {
                                 ++bcount;
                                 // TODO: hmm.
@@ -807,8 +803,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
                             ++tcount;
                         }
                         sum = 0.1f + sum * afactor + tsum * sqfactor;
-                        if (l >= 6 && l <= 12)
-                            log.trace("L=%d sum=%.6f b%d/t%d TSIZE=%d", l, sum, bcount, tcount, lit[l].TSIZE);
+//                        if (l >= 6 && l <= 12)
+//                            log.trace("L=%d sum=%.6f b%d/t%d TSIZE=%d", l, sum, bcount, tcount, lit[l].TSIZE);
                         hprime[l] = Float.min(THETA, sum);
                         // if (tracing.contains(Trace.SCORE)) log.trace("h[%s] = %.4f", lit[l], hprime[l]);
                     }
@@ -988,11 +984,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
             // Finally, if C > C_max, reduce C to C_max by retaining only top-ranked
             // candidates.
             if (CAND.size() > C_max) {
-                // Here's an allocation. Maybe we want to put heapification under
-                // user control. Can we also close over var[] that way... XXX
-                Heap<Variable> h = new Heap<>();  // TODO: move
-                h.heapify(CAND);
-                while (CAND.size() > C_max) h.pop();
+                candidateHeap.heapify(CAND);
+                while (CAND.size() > C_max) candidateHeap.pop();
             }
 
             ++BSTAMP;
@@ -1019,14 +1012,13 @@ public class SATAlgorithmL extends AbstractSATSolver {
 //                    }
                 }
             }
-            S = 0;
             // Compute candidate BIMP list.
+            CANDL.clear();
             for (int i = 0; i < CAND.size(); ++i) {
                 final Variable c = CAND.get(i);
                 for (int candlit = poslit(c).id; candlit <= neglit(c).id; ++candlit) {
                     final Literal u = lit[candlit];
-                    log.trace("considering: %s (bsize=%d, bimp size=%d) table = %s", u, u.BSIZE, u.BIMP.size(), u.BIMP);
-                    CANDL[S++] = u;
+                    CANDL.add(u);
                     u.vcomp = u;  // A field we will use after resolving into strong components
                     List<Literal> bimp = u.BIMP;
                     for (int j = 0; j < u.BSIZE; ++j) {
@@ -1037,7 +1029,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                             // atomically (the BIMP table contains both arrows, but not contiguously; if we are going to cap
                             // the number of arcs we consider, it is important that we don't strand one arc of a pair outside
                             // the graph).
-                            log.trace("arc for %d: %s -> %d, %d -> %s", dl(candlit), v, dl(candlit), dl(not(candlit)), v.not);
+                            // log.trace("arc for %d: %s -> %d, %d -> %s", dl(candlit), v, dl(candlit), dl(not(candlit)), v.not);
                             v.arcs.add(u);
                             u.not.arcs.add(v.not);  // TODO: type of v.
                         }
@@ -1047,18 +1039,17 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
             // One Weird Trick: do we need to reverse the order of the arcs to get our components out in the right
             // order?
-            if (knuthCompatible) for (int i = 0; i < S; ++i) Collections.reverse(CANDL[i].arcs);
+            if (knuthCompatible) for (int i = 0; i < CANDL.size(); ++i) Collections.reverse(CANDL.get(i).arcs);
 
-            for (int i = 0; i < S; ++i) {
-                Literal l = CANDL[i];
-                if (!l.arcs.isEmpty()) log.trace("Arcs: %s -> %s", l, l.arcs);
+            for (int i = 0; i < CANDL.size(); ++i) {
+                Literal l = CANDL.get(i);
+                if (tracing.contains(Trace.FOREST)) if (!l.arcs.isEmpty()) log.trace("Arcs: %s -> %s", l, l.arcs);
             }
 
             // X4 [Nest the candidates.]
 
             ConnectedComponents cc = new ConnectedComponents();
-            cc.find(CANDL, S);
-
+            cc.find(CANDL);
 
             // TODO: Knuth's Tarjan algorithm is modified to notice when ~v lives in v's SCC.
             // Our implementation does not notice this, but it would be easy to check, for
@@ -1069,12 +1060,13 @@ public class SATAlgorithmL extends AbstractSATSolver {
             // (this is used as an alternate component representative.) We also check here
             // to see if a component contains a literal contradictory to its CC representative.
 
-            for (int i = 0; i < S; ++i) {
-                final Literal l = CANDL[i];
+            for (int i = 0; i < CANDL.size(); ++i) {
+                final Literal l = CANDL.get(i);
                 // TODO: consider equipping literals with a pointer to their variable parents
                 if (l != l.parent && var[thevar(l.id)].rating > var[thevar(l.parent.vcomp.id)].rating) {
                     l.parent.vcomp = l;
                 }
+                // TODO: consider doing this in cc.find()
                 if (l == l.parent.not) {
                     if (tracing.contains(Trace.LOOKAHEAD)) log.trace("contradiction discovered in lookahead");
                     return false;
@@ -1086,10 +1078,9 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 for (Literal s = cc.settled(); s != null; s = s.link) {
                     final Literal t = s;
                     log.trace(() -> {
-                        StringBuilder sb = new StringBuilder(String.format(" %d %.4g", dl(t.id), var[thevar(t.id)].rating));
-                        if (t.parent != t) sb.append(" with ").append(dl(t.parent.id));
-                        else if (t.vcomp != t)
-                            sb.append("-> ").append(dl(t.vcomp.id)).append(String.format(" %.4g", var[t.vcomp.id >> 1].rating));
+                        StringBuilder sb = new StringBuilder(String.format(" %s %.4g", t, t.var.rating));
+                        if (t.parent != t) sb.append(" with ").append(t.parent);
+                        else if (t.vcomp != t) sb.append(" -> ").append(t.vcomp).append(String.format(" %.4g", t.var.rating));
                         return sb.toString();
                     });
                 }
@@ -1133,23 +1124,25 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 }
             }
 
-            if (tracing.contains(Trace.FOREST)) for (Literal l : CANDL) {
-                log.trace("  %d: height %d, child %s, link %s", dl(l.id), l.height,
-                        l.child != null ? dl(l.child.id) : 0,
-                        l.link != null ? dl(l.link.id) : 0);
+            if (tracing.contains(Trace.FOREST)) {
+                // TODO: can be different for loop in here
+                for (int i = 0; i < CANDL.size(); ++i) {
+                    final Literal l = CANDL.get(i);
+                    log.trace("  %5s: h %3d child %6s link %6s", l, l.height, l.child != null ? l.child : "", l.link != null ? l.link : "");
+                }
             }
 
             // Construct a sequence of literals LL[j] and corresponding truth offsets LO[j], for 0 <= j < S.
             // This is the "lookahead forest."
 
-            int looks = 0;
+            S = 0;
             {
                 int j = 0;
                 Literal u = root.child, v = null;
                 LOOK:
                 while (true) {
-                    look[looks].literal = u.vcomp;
-                    u.rank = looks++;  // k advances in preorder
+                    look[S].literal = u.vcomp;
+                    u.rank = S++;  // k advances in preorder
                     if (u.child != null) {
                         u.parent = v;  // fix parent temporarily for traversal
                         v = u;
@@ -1173,13 +1166,13 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         }
                     }
                 }
-                if (j != looks + looks) throw new IllegalStateException("confusion(looks)");
+                if (j != S + S) throw new IllegalStateException("confusion(looks)");
             }
 
             if (tracing.contains(Trace.FOREST)) {
                 log.trace("Looks at level %d", d);
-                for (int i = 0; i < looks; ++i) {
-                    log.trace(" %d %d", dl(look[i].literal.id), look[i].offset);
+                for (int i = 0; i < S; ++i) {
+                    log.trace(" %s %d", look[i].literal, look[i].offset);
                 }
             }
 
@@ -1225,7 +1218,9 @@ public class SATAlgorithmL extends AbstractSATSolver {
                             jp = j;
                         }
                         ++j;
+                        log.trace("we at j = %d, S = %d, jp = %d, looks = %d", j, S, jp, S);
                         if (j == S) {
+                            log.trace("we got to j == S");
                             j = 0;
                             BASE += 2 * S;
                         }
@@ -1234,40 +1229,46 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         continue;
                     case 8: { // [Compute sharper heuristic.]
                         //System.out.printf("now state 8...\n");
-                        if (!Perform72()) {
+                        l0 = l;
+                        // Where we left off: the above line. Does it help control the scope?
+                        // Can we get rid of l itself at this point and confine it to a parameter or local?
+                        if (!Perform72(l)) {
                             xstate = 13;
                             continue;
                         }
                         // Then...
                         if (w > 0) {
                             l0.H += w;
-                            log.trace("** now H[%s] = %.4f after adding %.4f parent=%s", l0, l0.H, w, l0.parent);
+                            // log.trace("** now H[%s] = %.4f after adding %.4f parent=%s", l0, l0.H, w, l0.parent);
                             xstate = 10;
                             continue;
                         }
                     }
                     case 9:  // [Exploit an autarky.]
                         if (l0.H == 0) {
-                            if (tracing.contains(Trace.LOOKAHEAD)) log.trace("autarky (a) at %s\n", l0);
+                            if (tracing.contains(Trace.FIXING)) log.trace("autarky at %s\n", l0);
                             if (!X12(l0)) {
                                 xstate = 13;
                                 continue;
                             }
                         } else {
                             // TODO: change l0 to a Literal, or at least cache the value of lit[l0]
-                            if (tracing.contains(Trace.LOOKAHEAD)) log.trace("autarky (b) at %s", l0);
+                            if (tracing.contains(Trace.FIXING)) log.trace(" autarky %s -> %s (%.4f)", l0.parent, l0, l0.H);
                             // Generate the binary clause l0 | ~PARENT(l0)
                             appendToBimp(l0.not, l0.parent.not);
                             appendToBimp(l0.parent, l0);
                         }
                     case 10:  // [Optionally look deeper.]
                     case 11:  // [Exploit necessary assignments.]
-                        // TODO: type of l0
                         List<Literal> bimp = l0.not.BIMP;
-                        for (int i = 0; i < l0.not.BSIZE; ++i) {
+                        // Knuth looks for these in reverse-BIMP order.
+                        for (int i = l0.not.BSIZE - 1; i >= 0; --i) {
                             Literal u = bimp.get(i);
                             Fixity f = fixity(u);
-                            if (f == Fixity.FIXED_T && u.var.VAL < PT) X12(u);
+                            if (f == Fixity.FIXED_T && u.var.VAL < PT) {
+                                if (tracing.contains(Trace.FIXING)) log.trace(" necessary %s", u);
+                                X12(u);
+                            }
                         }
                         xstate = 7;
                         continue;
@@ -1288,12 +1289,11 @@ public class SATAlgorithmL extends AbstractSATSolver {
             }
         }
 
-        boolean Perform72() {
-            l0 = l;
+        boolean Perform72(final Literal l) {
             w = 0;
             G = E = F;
             // TODO: get rid of this allocation
-            List<Literal> W = new ArrayList<>();
+            Stack<Literal> W = new Stack<>();
             // log.trace("%sfixing %d", tName(T), dl(l));
             if (!propagate(l)) return false;  // Perform (62).
             while (G < E) {
@@ -1315,44 +1315,46 @@ public class SATAlgorithmL extends AbstractSATSolver {
                                 log.trace("P72 contradiction: failed to propagate %s", v);
                             return false;
                         }
-                        W.add(v);
+                        W.push(v);
                     } else if (fu == Fixity.UNFIXED && fv == Fixity.FIXED_F) {
                         if (!propagate(u)) {
                             if (tracing.contains(Trace.FIXING))
                                 log.trace("P72 contradiction: failed to propagate %s", u);
                             return false;
                         }
-                        W.add(u);
+                        W.push(u);
                     } else {
                         assert fu == Fixity.UNFIXED && fv == Fixity.UNFIXED;
                         w += h[d][u.id] * h[d][v.id];
-                        log.trace("WNB += [%s:]%.4f * [%s:]%.4f = %.4f ---> %.4f",
-                                u, h[d][u.id],
-                                v, h[d][v.id],
-                                h[d][u.id] * h[d][v.id],
-                                w);
+//                        log.trace("WNB += [%s:]%.4f * [%s:]%.4f = %.4f ---> %.4f",
+//                                u, h[d][u.id],
+//                                v, h[d][v.id],
+//                                h[d][u.id] * h[d][v.id],
+//                                w);
                     }
                 }
                 // generate new binary clauses (lbar_0 | w) for w in W.
-                for (int i = 0; i < W.size(); ++i) {
-                    Literal w = W.get(i);
-                    // TODO: fix type
-                    if (tracing.contains(Trace.LOOKAHEAD)) log.trace("windfall %s->%s", l0, w);
-                    appendToBimp(l0, w);
-                    appendToBimp(w.not, l0.not);
-                }
-                // Through with the windfalls.
-                W.clear();
+
+                // Where we left off: is it possible windfalls are being processed in the
+                // reverse order vs. Knuth? Can we make W a stack?
             }
+            while (!W.isEmpty()) {
+                Literal w = W.pop();
+                // TODO: fix type
+                if (tracing.contains(Trace.LOOKAHEAD)) log.trace("windfall %s->%s", l, w);
+                appendToBimp(l, w);
+                appendToBimp(w.not, l.not);
+            }
+
             return true;
         }
 
         boolean X12(Literal l) {
-            if (tracing.contains(Trace.LOOKAHEAD)) log.trace("forcing %s", l);
             FORCE.add(l);
+            if (tracing.contains(Trace.FIXING)) log.trace("forcing %s (queue now contains %d)", l, FORCE.size());
             int oldT = T;
             T = PT;
-            boolean result = Perform72();
+            boolean result = Perform72(l);
             T = oldT;
             return result;
         }
@@ -1368,5 +1370,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private Literal poslit(Variable v) { return lit[poslit(v.id)]; }
     private Literal neglit(Variable v) { return lit[neglit(v.id)]; }
     private boolean isfree(Literal l) { return l.var.VAL < RT; }
-    private boolean isfixed(Literal l) { return l.var.VAL >= RT; }
+    private boolean isfixed(Literal l) { return l.var.VAL >= T; }
 }
+
+// where we left off: bimp divergence at ~6 (we have 3, 12, ~48, but in K the last of these is not present.
+// where did it come from? Without "bimp accuracy" nothing else will work

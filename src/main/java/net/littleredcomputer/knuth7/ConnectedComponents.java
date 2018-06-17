@@ -1,5 +1,7 @@
 package net.littleredcomputer.knuth7;
 
+import java.util.List;
+
 class ConnectedComponents {
     // An implementation of Tarjan's algorithm adapted to the problem of lookahead in a SAT solver
     // In particular, we wish to avoid memory allocation, if possible. (Still thinking about that.)
@@ -18,17 +20,17 @@ class ConnectedComponents {
 
     SATAlgorithmL.Literal settled() { return settledStack; }
 
-    void find(SATAlgorithmL.Literal[] view, int viewLength) {
-        for (int i = 0; i < viewLength; ++i) {
-            final SATAlgorithmL.Literal l = view[i];
+    void find(List<SATAlgorithmL.Literal> view) {
+        for (int i = 0; i < view.size(); ++i) {
+            final SATAlgorithmL.Literal l = view.get(i);
             l.rank = 0;
             l.untagged = 0;
         }
         activeStack = null;
         settledStack = null;
         nn = 0;
-        for (int i = 0; i < viewLength; ++i) {
-            if (view[i].rank == 0) process(view[i]);
+        for (int i = 0; i < view.size(); ++i) {
+            if (view.get(i).rank == 0) process(view.get(i));
         }
     }
 
@@ -50,9 +52,6 @@ class ConnectedComponents {
             SATAlgorithmL.Literal u;
 
             if (v.untagged < v.arcs.size()) {
-                // XXX where we left off: this doesn't work. At some points, we need to
-                // index over literals (from the cand array), but other times, we want data
-                // from the literal table.
                 u = v.arcs.get(v.untagged);  // u = the tip of the untagged arc from v
                 ++v.untagged;
                 if (u.rank != 0) {  // We've seen u already
