@@ -16,11 +16,15 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public class Main {
     private static Joiner spaceJoiner = Joiner.on(' ');
     private static Splitter commaSplitter = Splitter.on(',');
+    private static Pattern langfordRe = Pattern.compile("langford(\\d+)");
+    private static Pattern waerdenRe = Pattern.compile("waerden(\\d+,\\d+,\\d+)");
 
     private static Options options() {
         return new Options()
@@ -41,6 +45,19 @@ public class Main {
     }
 
     private static SATProblem satProblem(CommandLine cmd) throws FileNotFoundException {
+        if (!cmd.hasOption("problem")) throw new IllegalArgumentException("Must specify -problem");
+        String p = cmd.getOptionValue("problem");
+        Matcher lm = langfordRe.matcher(p);
+        if (lm.matches()) {
+            return SATProblem.langford(Integer.parseInt(lm.group(1)));
+        }
+        Matcher wm = waerdenRe.matcher(p);
+        if (wm.matches()) {
+            return SATProblem.waerden(Integer.parseInt(wm.group(1)),
+                    Integer.parseInt(wm.group(2)),
+                    Integer.parseInt(wm.group(3)));
+        }
+        // Didn't match a canned problem generator; try a file
         Reader r = problem(cmd);
         switch (cmd.getOptionValue("format", "cnf")) {
             case "cnf": return SATProblem.parseFrom(r);
@@ -56,7 +73,8 @@ public class Main {
             case "A": return SATAlgorithmA::new;
             case "B": return SATAlgorithmB::new;
             case "D": return SATAlgorithmD::new;
-            case "L3": return (p) -> new SATAlgorithmL(p.to3SAT());
+            case "L": return SATAlgorithmL::new;
+            case "L3": return p -> new SATAlgorithmL(p.to3SAT());
             default: throw new IllegalArgumentException("Unknown algorithm: " + a);
         }
     }

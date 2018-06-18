@@ -232,4 +232,99 @@ public class SATProblem {
         }
         return p;
     }
+
+    // TODO: redo these to avoid the text format.
+
+    /**
+     * Write the clauses corresponding to S1(y_i...) where the y_i correspond
+     * to the positions of the true bits (counting from 1).
+     *
+     * @param sb clauses written to this string.
+     */
+    private static int S1(List<Boolean> bits, StringBuilder sb) {
+        int n = 0;
+        // See eq. 7.2.2.2 (13). Step 1: write the clause requiring one bit:
+        for (int i = 0; i < bits.size(); ++i) {
+            if (bits.get(i)) sb.append(i + 1).append(' ');
+        }
+        sb.append("0\n");
+        ++n;
+        // Step 2: write clauses forbidding more than one.
+        for (int i = 0; i < bits.size(); ++i) {
+            if (bits.get(i)) {
+                for (int j = i + 1; j < bits.size(); ++j) {
+                    if (bits.get(j)) {
+                        sb.append(-i - 1).append(' ').append(-j - 1).append(" 0\n");
+                        ++n;
+                    }
+                }
+            }
+        }
+        return n;
+    }
+
+
+    /**
+     * Generate the SAT problem waerden(j, k; n), defined by 7.2.2.2 (10)
+     *
+     * @param j Number of consecutive 0s to require
+     * @param k Number of consecutive 1s to require
+     * @param n Length of binary string
+     * @return the problem posed in dimacs CNF format
+     */
+    public static SATProblem waerden(int j, int k, int n) {
+        StringBuilder clauses = new StringBuilder();
+        int clauseCount = 0;
+        // Variables [1,n].
+        // No j equally-spaced 0's in a string of length n
+        boolean addedSome = true;
+        for (int d = 1; addedSome; ++d) {
+            addedSome = false;
+            for (int i = 1; i + (j - 1) * d <= n; ++i) {
+                for (int h = 0; h < j; ++h) {
+                    clauses.append(i + d * h).append(' ');
+                    addedSome = true;
+                }
+                clauses.append("0\n");
+                ++clauseCount;
+            }
+        }
+        addedSome = true;
+        for (int d = 1; addedSome; ++d) {
+            addedSome = false;
+            for (int i = 1; i + (k - 1) * d <= n; ++i) {
+                for (int h = 0; h < k; ++h) {
+                    clauses.append(-i - d * h).append(' ');
+                    addedSome = true;
+                }
+                clauses.append("0 \n");
+                ++clauseCount;
+            }
+        }
+        return SATProblem.parseFrom(new StringReader("c waerden(" + j + ", " + k + ", " + n + ")\np cnf " + n + ' ' + clauseCount + '\n' + clauses));
+    }
+
+    public static SATProblem langford(int n) {
+        // We arrange the problem using "vertical" arrays, one for each column of the
+        // exact cover problem visualized as a matrix of rows of options. The first n
+        // columns (or items) represent the digits; the next 2n columns represent the
+        // placement of that digit (two of these per row). See 7.2.2.2 (11) of [F6].
+        int row = 0;
+        List<List<Boolean>> columns = new ArrayList<>(n + 2 * n);
+        for (int i = 0; i < 3 * n; ++i) columns.add(new ArrayList<>());
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j + i + 2 < 2 * n; ++j) {
+                for (List<Boolean> c : columns) c.add(false);
+                columns.get(i).set(row, true);
+                columns.get(n + j).set(row, true);
+                columns.get(n + j + i + 2).set(row, true);
+                //System.out.printf("row %d means set %d in columns %d and %d\n", row+1, i, j, j+i+2);
+                ++row;
+            }
+        }
+        int nClauses = 0;
+        StringBuilder sb = new StringBuilder();
+        for (List<Boolean> c : columns) nClauses += S1(c, sb);
+        return SATProblem.parseFrom(new StringReader("c langford(" + n + ")\np cnf " + row + ' ' + nClauses + "\n" + sb));
+    }
 }

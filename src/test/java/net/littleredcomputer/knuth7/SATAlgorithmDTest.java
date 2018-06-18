@@ -8,7 +8,7 @@ import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
-public class SATAlgorithmDTest extends TestProblems {
+public class SATAlgorithmDTest extends SATTestBase {
     private Function<SATProblem, AbstractSATSolver> D = SATAlgorithmD::new;
 
     @Test public void ex6() { testEx6With(D); }

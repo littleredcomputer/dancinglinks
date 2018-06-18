@@ -18,7 +18,7 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.Matchers.contains;
 import static org.junit.Assert.assertThat;
 
-public class SATProblemTest extends TestProblems {
+public class SATProblemTest extends SATTestBase {
 
     @Test
     public void simple() {
@@ -88,7 +88,7 @@ public class SATProblemTest extends TestProblems {
 
     @Test
     public void unsatEvalsToFalse() {
-        SATProblem l9 = langfordProblem(9);
+        SATProblem l9 = SATProblem.langford(9);
         algorithms.forEach(a -> assertThat(a.apply(l9), isEmpty()));
         final int N = l9.nVariables();
         boolean[] v = new boolean[N];

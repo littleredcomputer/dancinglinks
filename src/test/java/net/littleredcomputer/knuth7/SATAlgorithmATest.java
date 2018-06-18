@@ -7,7 +7,7 @@ import java.util.function.Function;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
-public class SATAlgorithmATest extends TestProblems {
+public class SATAlgorithmATest extends SATTestBase {
     private Function<SATProblem, AbstractSATSolver> A = SATAlgorithmA::new;
 
     @Test public void ex6() { testEx6With(A); }
