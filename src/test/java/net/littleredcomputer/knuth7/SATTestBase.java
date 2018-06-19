@@ -17,15 +17,6 @@ import java.util.stream.Stream;
 import static java.util.stream.Collectors.toList;
 
 public class SATTestBase {
-    int waerden(int j, int k, Function<SATProblem, AbstractSATSolver> solver) {
-        // waerdenProblem(j, k, n) is satisfiable iff n < W(j, k). Compute W by finding the smallest
-        // integer for which the associated problem is unsatisfiable.
-        return IntStream.range(1, 1000)
-                .filter(i -> !solver.apply(SATProblem.waerden(j, k, i)).solve().isPresent())
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("did not establish Waerden value"));
-    }
-
     private static final SATProblem hole6 = fromResource("hole6.cnf");
     private static final SATProblem zebra = fromResource("zebra.cnf");
     private static final SATProblem quinn = fromResource("quinn.cnf");
@@ -66,7 +57,7 @@ public class SATTestBase {
         Assert.assertThat(a.apply(p).solve(), OptionalMatchers.isEmpty());
     }
 
-    public void testLangfordWith(Function<SATProblem, AbstractSATSolver> a) {
+    void testLangfordWith(Function<SATProblem, AbstractSATSolver> a) {
         Supplier<IntStream> range = () -> IntStream.range(2, 10);
         // The langford problem is solvable iff i mod 4 in {0, 3}. When it is solvable, we should expect the
         // number of true variables to be equal to the problem size (i.e., each digit receives exactly one
@@ -74,12 +65,22 @@ public class SATTestBase {
         List<Optional<Integer>> expected = range.get().mapToObj(i -> i % 4 == 0 || i % 4 == 3 ? Optional.of(i) : Optional.<Integer>empty()).collect(toList());
         Stream<Optional<Integer>> observed = range.get().mapToObj(i -> {
             SATProblem Li = SATProblem.langford(i);
-            return a.apply(Li).solve()
+            return a.apply(Li)
+                    .solve()
                     .map(k -> Arrays.copyOfRange(k, 0, Li.nVariables()))
                     .map(Booleans::asList)
                     .map(bs -> bs.stream().mapToInt(b -> b ? 1 : 0).sum());
         });
         Assert.assertThat(observed.collect(toList()), CoreMatchers.is(expected));
+    }
+
+    int waerden(int j, int k, Function<SATProblem, AbstractSATSolver> solver) {
+        // waerdenProblem(j, k, n) is satisfiable iff n < W(j, k). Compute W by finding the smallest
+        // integer for which the associated problem is unsatisfiable.
+        return IntStream.range(1, 1000)
+                .filter(i -> !solver.apply(SATProblem.waerden(j, k, i)).solve().isPresent())
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("did not establish Waerden value"));
     }
 
     // Compose a solver factory with an evaluation step to create a one-step solution function

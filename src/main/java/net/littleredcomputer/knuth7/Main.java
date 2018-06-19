@@ -23,8 +23,9 @@ import java.util.stream.Stream;
 public class Main {
     private static Joiner spaceJoiner = Joiner.on(' ');
     private static Splitter commaSplitter = Splitter.on(',');
-    private static Pattern langfordRe = Pattern.compile("langford(\\d+)");
-    private static Pattern waerdenRe = Pattern.compile("waerden(\\d+,\\d+,\\d+)");
+    private static Pattern langfordRe = Pattern.compile("langford\\((\\d+)\\)");
+    private static Pattern waerdenRe = Pattern.compile("waerden\\((\\d+),(\\d+),(\\d+)\\)");
+    private static Pattern randomRe = Pattern.compile("random\\((\\d+),(\\d+),(\\d+),(\\d+)\\)");
 
     private static Options options() {
         return new Options()
@@ -56,6 +57,13 @@ public class Main {
             return SATProblem.waerden(Integer.parseInt(wm.group(1)),
                     Integer.parseInt(wm.group(2)),
                     Integer.parseInt(wm.group(3)));
+        }
+        Matcher rm = randomRe.matcher(p);
+        if (rm.matches()) {
+            return SATProblem.randomInstance(Integer.parseInt(rm.group(1)),
+                    Integer.parseInt(rm.group(2)),
+                    Integer.parseInt(rm.group(3)),
+                    Integer.parseInt(rm.group(4)));
         }
         // Didn't match a canned problem generator; try a file
         Reader r = problem(cmd);
@@ -154,7 +162,7 @@ public class Main {
                 }
                 break;
             case "sat": {
-                SATProblem p = SATProblem.parseFrom(problem(cmd));
+                SATProblem p = satProblem(cmd);
                 Stopwatch sw = Stopwatch.createStarted();
                 AbstractSATSolver s = solver(cmd).apply(p);
                 s.setLogInterval(logInterval(cmd));
@@ -173,15 +181,11 @@ public class Main {
                 break;
             }
             case "to3sat": {
-                SATProblem p = satProblem(cmd).to3SAT();
-                System.out.println("~~ " + Joiner.on(" ").join(args));
-                for (int i = 0; i < p.nClauses(); ++i) {
-                    List<Integer> c = p.getClause(i);
-                    for (int l : c) {
-                        System.out.printf("%s%d ", l < 0 ? "~": "", Math.abs(l));
-                    }
-                    System.out.println();
-                }
+                satProblem(cmd).to3SAT().printKnuth(System.out, Joiner.on(" ").join(args));
+                break;
+            }
+            case "print": {
+                satProblem(cmd).printKnuth(System.out, Joiner.on(" ").join(args));
                 break;
             }
             default:

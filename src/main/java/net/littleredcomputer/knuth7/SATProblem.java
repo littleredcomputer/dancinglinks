@@ -3,6 +3,7 @@ package net.littleredcomputer.knuth7;
 import com.google.common.base.Splitter;
 
 import java.io.BufferedReader;
+import java.io.PrintStream;
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.*;
@@ -21,6 +22,8 @@ public class SATProblem {
     private int nLiterals = 0;
     private int height = 0;
 
+    // TODO: make private when we switch to the builder pattern.
+    // The builder pattern ought also to allow named variables.
     SATProblem(int nVariables) {
         if (nVariables < 1) throw new IllegalArgumentException("Must have at least one variable");
         this.nVariables = nVariables;
@@ -60,6 +63,8 @@ public class SATProblem {
         int sign = ((literal & 1) == 0) ? 1 : -1;
         return sign * (literal >> 1);
     }
+
+    // TODO: creating a builder class would go a long way toward cleaning up the creation logic.
 
     void addClause(Iterable<Integer> literals) {
         List<Integer> clause = StreamSupport.stream(literals.spliterator(), false).map(SATProblem::encodeLiteral).collect(Collectors.collectingAndThen(toList(), Collections::unmodifiableList));
@@ -326,5 +331,16 @@ public class SATProblem {
         StringBuilder sb = new StringBuilder();
         for (List<Boolean> c : columns) nClauses += S1(c, sb);
         return SATProblem.parseFrom(new StringReader("c langford(" + n + ")\np cnf " + row + ' ' + nClauses + "\n" + sb));
+    }
+
+    public void printKnuth(PrintStream p, String title) {
+        p.println("~ " + title);
+        for (int i = 0; i < nClauses(); ++i) {
+            List<Integer> c = getClause(i);
+            for (int l : c) {
+                p.printf("%s%d ", l < 0 ? "~": "", Math.abs(l));
+            }
+            p.println();
+        }
     }
 }
