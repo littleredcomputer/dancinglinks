@@ -4,15 +4,8 @@ import java.util.List;
 
 class ConnectedComponents {
     // An implementation of Tarjan's algorithm adapted to the problem of lookahead in a SAT solver
-    // In particular, we wish to avoid memory allocation, if possible. (Still thinking about that.)
-
-    // What we need:
-    // A collection of vertices, and for each of them, a collection of edges, that we can partition
-    // into tagged and untagged.
-
-    // The desire to avoid allocation poses a challenge here. Essentially, the vertices are literals,
-    // and so we would like to reuse the data already allocated to the literals in the computation of
-    // the connected components.
+    // In particular, this has been designed to perform no heap allocations whatsoever, so that the
+    // use of this object during SAT solving will not result in any increment in memory pressure.
 
     private SATAlgorithmL.Literal activeStack;
     private SATAlgorithmL.Literal settledStack;
@@ -83,9 +76,7 @@ class ConnectedComponents {
         v.link = settledStack;
         settledStack = t;  // We've moved the top of one stack to the other
 
-        // System.out.println(" also includes:");
         for (; t != v; t = t.link) {
-            // System.out.printf("%d (from %d to %d)\n", t.id, t.parent.id, t.min.id);
             t.rank = Integer.MAX_VALUE;  // now t is settled
             t.parent = v;  // and its strong component is represented by v
         }

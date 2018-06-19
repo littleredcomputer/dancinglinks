@@ -45,26 +45,35 @@ public class SATAlgorithmLTest extends SATTestBase {
     @Test public void testZebra() { testZebraWith(L3); }
     @Test public void testQuinn() { testQuinnWith(L); }
 
-    @Test public void rand3_420_100_0_L() { assertUNSAT(rand3_420_100_0, L); }
 
     // This one still takes a long time
     /* @Test */ public void rand3_2062_500_314_L() { assertUNSAT(SATProblem.randomInstance(3, 2062, 500, 314), L); }
 
-    @Test public void w_3_4_17_L() {
+    @Test public void w_3_4_17() {
         SATProblem p = SATProblem.waerden(3,4,17);
         SATAlgorithmL a = new SATAlgorithmL(p.to3SAT());
+        a.trackChoices = true;
         assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
+        // This is sort of delicate but getting all the computations working in the same way
+        // Knuth's model implementation does took a lot of effort. The sequence of variable choices,
+        // backtrack points etc. are sensitive to the details of the implementation. This sequence
+        // has been hand-checked to correspond with sat11.w's choices.
+        assertThat(a.track.toString(), is("[~9, 15, ~15, 9, ~8, 8, ~7, null, null]"));
     }
-    @Test public void w_4_4_35_L() {
+
+    @Test public void rand3_420_100_0_L() {
+        SATAlgorithmL a = new SATAlgorithmL(rand3_420_100_0);
+        a.trackChoices = true;
+        assertThat(a.solve().map(rand3_420_100_0::evaluate), isEmpty());
+        assertThat(a.track.toString(), is("[3, 42, ~84, 61, 52, ~52, ~26, 26, ~61, 84, ~11, 40, ~40, 11, ~14, 14, ~42, ~6, 40, 4, 52, 65, ~65, ~52, ~4, ~40, 6, 2, ~2, ~3, ~94, 94]"));
+    }
+
+    @Test public void w_4_4_35() {
         assertThat(solveWith(L3).apply(SATProblem.waerden(4, 4, 35)), isEmpty());
     }
 
     // This passes, but takes ~ 4 minutes */
     /* @Test */ public void w_4_4_35_LnoX() { assertThat(solveWith(L3NoX).apply(SATProblem.waerden(4, 4, 35)), isEmpty()); }
-
-    @Test public void w_4_4_35_D() {
-        assertThat(solveWith(SATAlgorithmD::new).apply(SATProblem.waerden(4, 4, 35)), isEmpty());
-    }
 
     @Test public void langford9_noX() {
         assertThat(solveWith(L3NoX).apply(SATProblem.langford(9)), isEmpty());
