@@ -733,11 +733,12 @@ public class SATAlgorithmL extends AbstractSATSolver {
         private final ArrayList<Literal> CANDL = new ArrayList<>();  // candidate literals
         private final Lookahead[] look;  // lookahead entries
         int S;  // number of valid look[] entries
+        private final Deque<Literal> W = new ArrayDeque<>();  // windfalls
 
-        final float alpha = 3.5f;
-        final float THETA = 20.0f;
-        final int C0 = 30, C1 = 600;  // See Ex. 148
-        final int nVariables;
+        private final float alpha = 3.5f;
+        private final float THETA = 20.0f;
+        private final int C0 = 30, C1 = 600;  // See Ex. 148
+        private final int nVariables;
         private double w = 0.0;  // Current weight of lookahead choice. TODO it is dodgy that this is an instance variable...
         private final float[][] h;  // h[d][l] is the h-score ("rough heuristic") of literal l at depth d
         private final Heap<Variable> candidateHeap = new Heap<>();
@@ -1045,17 +1046,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 }
             }
 
-            if (tracing.contains(Trace.FOREST)) {
-                // TODO: can be different for loop in here
-                for (int i = 0; i < CANDL.size(); ++i) {
-                    final Literal l = CANDL.get(i);
-                    log.trace("  %5s: h %3d child %6s link %6s", l, l.height, l.child != null ? l.child : "", l.link != null ? l.link : "");
-                }
-            }
-
             // Construct a sequence of literals LL[j] and corresponding truth offsets LO[j], for 0 <= j < S.
             // This is the "lookahead forest."
-
             S = 0;
             {
                 int j = 0;
@@ -1116,7 +1108,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         if (tracing.contains(Trace.LOOKAHEAD))
                             log.trace("looking at %s @%d H=%.4g", l, T, l.H);
 
-                        // TODO: type of l
                         Fixity f = fixity(l);
                         if (f == Fixity.UNFIXED) {
                             xstate = 8;
@@ -1169,7 +1160,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                                 continue;
                             }
                         } else {
-                            // TODO: change l0 to a Literal, or at least cache the value of lit[l0]
                             if (tracing.contains(Trace.FIXING)) log.trace(" autarky %s -> %s (%.4f)", l0.parent, l0, l0.H);
                             // Generate the binary clause l0 | ~PARENT(l0)
                             appendToBimp(l0.not, l0.parent.not);
@@ -1210,7 +1200,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
             w = 0;
             G = E = F;
             // TODO: get rid of this allocation
-            Deque<Literal> W = new ArrayDeque<>();
+            W.clear();
             // log.trace("%sfixing %d", tName(T), dl(l));
             if (!propagate(l)) return false;  // Perform (62).
             while (G < E) {
