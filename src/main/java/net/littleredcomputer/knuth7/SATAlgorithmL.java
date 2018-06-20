@@ -281,13 +281,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         return true;
     }
 
-    /* True if BIMP[b] contains l. */
-    private boolean bimpContains(Literal b, Literal l) {
-        final List<Literal> bimpl = b.BIMP;
-        for (int i = 0; i < b.BSIZE; ++i) if (bimpl.get(i) == l) return true;
-        return false;
-    }
-
     /* Append l to BIMP[b], allowing for an undo in the future. */
     private void appendToBimp(Literal b, Literal l) {
         final int bsize = b.BSIZE;
@@ -1246,7 +1239,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     if (l.TSIZE > 0) return false;
                     List<Literal> bimpl = l.BIMP;
                     for (int j = 0; j < l.BSIZE; ++j) {
-                        if (fixity(bimpl.get(j)) == Fixity.UNFIXED) return false;
+                        if (!isfixed(bimpl.get(j))) return false;
                     }
                 }
             }
