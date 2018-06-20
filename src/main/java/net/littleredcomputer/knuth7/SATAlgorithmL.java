@@ -112,8 +112,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
     // private Literal l = null;  // Current branch literal
     private int SIG = 0;  // Current prefix of binary encoding of branch state
     private int SIGL = 0;
-    final List<Literal> track = new ArrayList<>();
-    boolean trackChoices = false;
+    private final List<Literal> track = new ArrayList<>();  // used to record linear branch sequence, for test purposes
+    boolean trackChoices = false;  // if true, track array will be filled during search for testing; otherwise not
     boolean useX = true;  // whether to use algorithm X for lookahead
     boolean knuthCompatible = true;
 
@@ -300,7 +300,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         else if (bimp.size() == bsize) bimp.add(l);
         else throw new IllegalStateException("bimp size invariant violation");
         ++b.BSIZE;
-        assert bimpContains(b, l);  // TODO: get rid of this
     }
 
     private void makeParticipants(Variable v, Variable w) {
@@ -391,7 +390,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     /* Returns the fixity of l in the context T */
     private Fixity fixity(Literal l) {
         int val = l.var.VAL;
-        if (val < T) return Fixity.UNFIXED;  // TODO: consider changing this to if (unfixed(l))?
+        if (val < T) return Fixity.UNFIXED;
         return negated(val) == negated(l.id) ? Fixity.FIXED_T : Fixity.FIXED_F;
     }
 
@@ -672,11 +671,11 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
                             for (int p = xlit.TIMP, tcount = 0; tcount < xlit.TSIZE; p = NEXT.get(p), ++tcount)
                                 buf.add(p);
-                            buf.forEachDescending(p -> {
-                                ++U.get(p).not.TSIZE;
-                                ++V.get(p).not.TSIZE;
-                                return true;
-                            });
+                            for (int p = buf.size() - 1; p >= 0; --p) {
+                                final int k = buf.getQuick(p);
+                                ++U.get(k).not.TSIZE;
+                                ++V.get(k).not.TSIZE;
+                            }
                         }
                         X.VAL = 0;
                     }
@@ -753,8 +752,43 @@ public class SATAlgorithmL extends AbstractSATSolver {
             Arrays.setAll(look, i -> new Lookahead());
         }
 
-        private float[] computeHeuristics() {
+        private void heuristicStep(float[] from, float[] to) {
+            float sum, tsum, factor, sqfactor, afactor;
             final int N = nVariables - F;
+
+            sum = 0;
+            for (int i = 0; i < N; ++i) {
+                final Variable v = VAR[i];
+                sum += from[poslit(v).id] + from[neglit(v).id];
+            }
+            factor = 2f * N / sum;
+            sqfactor = factor * factor;
+            afactor = alpha * factor;
+            // TODO: this allocation needs to be killed; use Knuth's technique of alternating between two static arrays.
+            for (int i = 0; i < N; ++i) {
+                final Variable v = VAR[i];
+                for (int li = poslit(v).id; li <= neglit(v).id; ++li) {
+                    final Literal l = lit[li];
+                    sum = 0;
+                    // for all u in BIMP[l] with u not fixed
+                    List<Literal> bimpl = l.BIMP;
+                    for (int j = 0; j < l.BSIZE; ++j) {
+                        final Literal u = bimpl.get(j);
+                        if (isfree(u)) {
+                            sum += from[u.id];
+                        }
+                    }
+                    tsum = 0;
+                    for (int p = l.TIMP, j = 0; j < l.TSIZE; p = NEXT.get(p), ++j) {
+                        tsum += from[U.get(p).id] * from[V.get(p).id];
+                    }
+                    sum = 0.1f + sum * afactor + tsum * sqfactor;
+                    to[li] = Float.min(THETA, sum);
+                }
+            }
+        }
+
+        private float[] computeHeuristics() {
 
             if (h[d] == null) {
                 h[d] = new float[2 * nVariables + 2];
@@ -766,40 +800,10 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
             // Step X1 is performed before this routine is called.
             // Step X2: Compile rough heuristics.
-            float sum, tsum, factor, sqfactor, afactor;
 
+            float[] hprime = new float[hd.length];
             for (int k = 0; k < nCycles; ++k) {
-                sum = 0;
-                for (int i = 0; i < N; ++i) {
-                    final Variable v = VAR[i];
-                    sum += hd[poslit(v).id] + hd[neglit(v).id];
-                }
-                factor = 2f * N / sum;
-                sqfactor = factor * factor;
-                afactor = alpha * factor;
-                // TODO: this allocation needs to be killed; use Knuth's technique of alternating between two static arrays.
-                float[] hprime = new float[hd.length];
-                for (int i = 0; i < N; ++i) {
-                    final Variable v = VAR[i];
-                    for (int li = poslit(v).id; li <= neglit(v).id; ++li) {
-                        final Literal l = lit[li];
-                        sum = 0;
-                        // for all u in BIMP[l] with u not fixed
-                        List<Literal> bimpl = l.BIMP;
-                        for (int j = 0; j < l.BSIZE; ++j) {
-                            final Literal u = bimpl.get(j);
-                            if (isfree(u)) {
-                                sum += hd[u.id];
-                            }
-                        }
-                        tsum = 0;
-                        for (int p = l.TIMP, j = 0; j < l.TSIZE; p = NEXT.get(p), ++j) {
-                            tsum += hd[U.get(p).id] * hd[V.get(p).id];
-                        }
-                        sum = 0.1f + sum * afactor + tsum * sqfactor;
-                        hprime[li] = Float.min(THETA, sum);
-                    }
-                }
+                heuristicStep(hd, hprime);
                 System.arraycopy(hprime, 2, hd, 2, 2 * nVariables);
             }
             return hd;
@@ -1173,7 +1177,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         private boolean Perform72(final Literal l) {
             w = 0;
             G = E = F;
-            // TODO: get rid of this allocation
             W.clear();
             if (!propagate(l)) return false;  // Perform (62).
             while (G < E) {
@@ -1212,7 +1215,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
             // generate new binary clauses (lbar_0 | w) for w in W. Knuth performs these steps in LIFO order; so do we.
             while (!W.isEmpty()) {
                 Literal w = W.pop();
-                // TODO: fix type
                 if (tracing.contains(Trace.LOOKAHEAD)) log.trace("windfall %s->%s", l, w);
                 appendToBimp(l, w);
                 appendToBimp(w.not, l.not);
@@ -1265,6 +1267,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private Literal neglit(Variable v) { return lit[neglit(v.id)]; }
     private boolean isfree(Literal l) { return l.var.VAL < RT; }
     private boolean isfixed(Literal l) { return l.var.VAL >= T; }
+    String track() { return track.toString(); }
 }
 
 // where we left off: bimp divergence at ~6 (we have 3, 12, ~48, but in K the last of these is not present.

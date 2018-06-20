@@ -58,14 +58,15 @@ public class SATAlgorithmLTest extends SATTestBase {
         // Knuth's model implementation does took a lot of effort. The sequence of variable choices,
         // backtrack points etc. are sensitive to the details of the implementation. This sequence
         // has been hand-checked to correspond with sat11.w's choices.
-        assertThat(a.track.toString(), is("[~9, 15, ~15, 9, ~8, 8, ~7, null, null]"));
+        assertThat(a.track(), is("[~9, 15, ~15, 9, ~8, 8, ~7, null, null]"));
     }
 
     @Test public void rand3_420_100_0_L() {
         SATAlgorithmL a = new SATAlgorithmL(rand3_420_100_0);
         a.trackChoices = true;
         assertThat(a.solve().map(rand3_420_100_0::evaluate), isEmpty());
-        assertThat(a.track.toString(), is("[3, 42, ~84, 61, 52, ~52, ~26, 26, ~61, 84, ~11, 40, ~40, 11, ~14, 14, ~42, ~6, 40, 4, 52, 65, ~65, ~52, ~4, ~40, 6, 2, ~2, ~3, ~94, 94]"));
+        assertThat(a.track(), is("[3, 42, ~84, 61, 52, ~52, ~26, 26, ~61, 84, ~11, 40, ~40, 11," +
+                " ~14, 14, ~42, ~6, 40, 4, 52, 65, ~65, ~52, ~4, ~40, 6, 2, ~2, ~3, ~94, 94]"));
     }
 
     @Test public void w_4_4_35() {
@@ -75,11 +76,20 @@ public class SATAlgorithmLTest extends SATTestBase {
     // This passes, but takes ~ 4 minutes */
     /* @Test */ public void w_4_4_35_LnoX() { assertThat(solveWith(L3NoX).apply(SATProblem.waerden(4, 4, 35)), isEmpty()); }
 
-    @Test public void langford9_noX() {
-        assertThat(solveWith(L3NoX).apply(SATProblem.langford(9)), isEmpty());
+    // langford9 under noX revealed a bug with no-branch nodes, but this takes a while. rand(3,32,9,2010) is
+    // a smaller problem that reveals the same bug.
+    /* @Test */ public void langford9_noX() {
+        final SATProblem l9 = SATProblem.langford(9);
+        assertThat(solveWith(L3NoX).apply(l9), isEmpty());
+        assertThat(solveWith(L3).apply(l9), isEmpty());
     }
+
+    @Test public void rand_3_32_9_2010_noX() {
+        assertThat(solveWith(L3NoX).apply(SATProblem.randomInstance(3,32,9,2010)), isPresentAndIs(true));
+    }
+
+
     @Test public void langford9_L() {
-        assertThat(solveWith(L3).apply(SATProblem.langford(9)), isEmpty());
     }
 
     @Test public void w_3_4_13_L() {
@@ -104,12 +114,14 @@ public class SATAlgorithmLTest extends SATTestBase {
     }
 
     @Test public void manySmallRandomInstances() {
-        final int k = 3, m = 640, n = 150;
-        for (int i = 0; i < 250; ++i) {
+        final int k = 3, m = 640, n = 150, N = 250;
+        int unsat = 0, sat = 0;
+        for (int i = 0; i < N; ++i) {
             Optional<Boolean> a = solveWith(L).apply(SATProblem.randomInstance(k, m, n, i));
-            log.info("Random SAT test %d %d %d %d -> %s", k, m, n, i, a.map(b -> b ? "SAT" : "BROKEN").orElse("UNSAT"));
             assertThat(a, is(either(isPresentAndIs(true)).or(isEmpty())));
+            if (a.isPresent()) ++sat; else ++unsat;
         }
+        log.info("After %d tests %d sat %d unsat", N, sat, unsat);
     }
 
     @Test
