@@ -41,7 +41,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         long IST = 0;
         int TIMP;  // index of first pair of implicants in U,V arrays
         // final TIntArrayList BIMP = new TIntArrayList();
-        List<Literal> BIMP;
+        final List<Literal> BIMP = new ArrayList<>();
 
         // auxiliary data for Tarjan's algorithm
         long bstamp = 0;  // bstamp value identifies current generation of candidates
@@ -214,9 +214,10 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     throw new IllegalArgumentException("Algorithm L can only cope with 3SAT at the moment " + clause.size());
             }
         });
-        for (int l = 2; l < literalAllocation; ++l) {
-            lit[l].BIMP = oBIMP.get(l).stream().map(i -> lit[i]).collect(Collectors.toList());
-            lit[l].BSIZE = lit[l].BIMP.size();
+        for (int li = 2; li < literalAllocation; ++li) {
+            final Literal l = lit[li];
+            oBIMP.get(li).forEach(i -> l.BIMP.add(lit[i]));
+            l.BSIZE = l.BIMP.size();
         }
         units.forEach(i -> FORCE.add(lit[i]));
         if (!FORCE.isEmpty() && tracing.contains(Trace.SEARCH)) log.trace("initially forcing %s", FORCE);
@@ -273,7 +274,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
             case FIXED_T: return true;
             case FIXED_F: return false; /* conflict */
             case UNFIXED:
-                if (tracing.contains(Trace.FIXING)) log.trace("%s%sfixing %s", subordinate ? " " : "", tName(T), l);
+                if (tracing.contains(Trace.FIXING)) log.trace("%s%sfixing %s", subordinate ? " " : "", truthName(T), l);
                 l.var.VAL = T + (l.id & 1);
                 R[E++] = l;
         }
@@ -741,6 +742,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         private final int nVariables;
         private double w = 0.0;  // Current weight of lookahead choice. TODO it is dodgy that this is an instance variable...
         private final float[][] h;  // h[d][l] is the h-score ("rough heuristic") of literal l at depth d
+        private final float[] hprime;  // storage for refinement steps of heuristic score
         private final Heap<Variable> candidateHeap = new Heap<>();
         private final ConnectedComponents connectedComponents = new ConnectedComponents();
 
@@ -748,6 +750,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         AlgorithmX() {
             nVariables = problem.nVariables();
             h = new float[nVariables + 1][];
+            hprime = new float[2*nVariables+2];
             look = new Lookahead[2*nVariables];
             Arrays.setAll(look, i -> new Lookahead());
         }
@@ -764,7 +767,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
             factor = 2f * N / sum;
             sqfactor = factor * factor;
             afactor = alpha * factor;
-            // TODO: this allocation needs to be killed; use Knuth's technique of alternating between two static arrays.
             for (int i = 0; i < N; ++i) {
                 final Variable v = VAR[i];
                 for (int li = poslit(v).id; li <= neglit(v).id; ++li) {
@@ -788,23 +790,22 @@ public class SATAlgorithmL extends AbstractSATSolver {
             }
         }
 
+        /** Step X2: Compile rough heuristics. */
         private float[] computeHeuristics() {
-
             if (h[d] == null) {
                 h[d] = new float[2 * nVariables + 2];
             }
-            if (d <= 1) Arrays.fill(h[d], 1);
-            else System.arraycopy(h[d - 1], 0, h[d], 0, h[d].length);
             float[] hd = h[d];
-            int nCycles = d <= 1 ? 5 : 1;
 
-            // Step X1 is performed before this routine is called.
-            // Step X2: Compile rough heuristics.
-
-            float[] hprime = new float[hd.length];
-            for (int k = 0; k < nCycles; ++k) {
+            if (d <= 1) {
+                Arrays.fill(hprime, 1);
+                heuristicStep(hprime, hd);
                 heuristicStep(hd, hprime);
-                System.arraycopy(hprime, 2, hd, 2, 2 * nVariables);
+                heuristicStep(hprime, hd);
+                heuristicStep(hd, hprime);
+                heuristicStep(hprime, hd);
+            } else {
+                heuristicStep(h[d-1], hd);
             }
             return hd;
         }
@@ -876,8 +877,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
             // While C > 2 C_max, delete all elements of CAND whose rating
             // is less than the mean rating; but terminate the loop if no elements are
             // actually deleted.
-
-
             while (CAND.size() > 2 * C_max) {
                 // Compute the mean score.
                 final int sz = CAND.size();
@@ -1116,8 +1115,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     case 8: { // [Compute sharper heuristic.]
                         //System.out.printf("now state 8...\n");
                         l0 = l;
-                        // Where we left off: the above line. Does it help control the scope?
-                        // Can we get rid of l itself at this point and confine it to a parameter or local?
                         if (!Perform72(l)) {
                             xstate = 13;
                             continue;
@@ -1144,6 +1141,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                             appendToBimp(l0.parent, l0);
                         }
                     case 10:  // [Optionally look deeper.]
+                        y();
                     case 11:  // [Exploit necessary assignments.]
                         List<Literal> bimp = l0.not.BIMP;
                         // Knuth looks for these in reverse-BIMP order.
@@ -1256,7 +1254,11 @@ public class SATAlgorithmL extends AbstractSATSolver {
         }
     }
 
-    private String tName(int t) {
+    private void y() {
+
+    }
+
+    private String truthName(int t) {
         if (t >= RT) return "real";
         if (t >= NT) return "near";
         if (t >= PT) return "proto";
