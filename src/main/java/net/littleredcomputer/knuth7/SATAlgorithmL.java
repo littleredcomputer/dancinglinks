@@ -8,6 +8,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 public class SATAlgorithmL extends AbstractSATSolver {
@@ -63,7 +64,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         Literal child;
         int height;
         float H;  // the "refined" heuristic score
-        int DFAIL = 0;  // used in Algorithm Y
+        long DFAIL = 0;  // used in Algorithm Y
 
         final List<Literal> arcs = new ArrayList<>();
 
@@ -109,19 +110,20 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private long ISTAMP = 0;  // Knuth points out (sat11.w:1528) that this could conceivably overflow a 32-bit int
     private long BSTAMP = 0;  // stamp value of current candidate list in algorithm X
     private int d = 0;  // current depth within search tree
-    private int state = 2;  // currently executing step of algorithm L
+    // private int state = 2;  // currently executing step of algorithm L
     // private Literal l = null;  // Current branch literal
     private int SIG = 0;  // Current prefix of binary encoding of branch state
     private int SIGL = 0;
     private final List<Literal> track = new ArrayList<>();  // used to record linear branch sequence, for test purposes
     boolean trackChoices = false;  // if true, track array will be filled during search for testing; otherwise not
     boolean useX = true;  // whether to use algorithm X for lookahead
+    boolean useY = true;  // whether to use algorithm Y for double-lookahead
     boolean knuthCompatible = true;
 
     private enum Trace {STEP, SEARCH, LOOKAHEAD, BIMP, SCORE, FIXING, FOREST}
 
-    EnumSet<Trace> tracing = EnumSet.noneOf(Trace.class);
-    // EnumSet<Trace> tracing = EnumSet.of(Trace.BIMP);
+    // EnumSet<Trace> tracing = EnumSet.noneOf(Trace.class);
+    EnumSet<Trace> tracing = EnumSet.of(Trace.FIXING, Trace.LOOKAHEAD);
     private AlgorithmX x = null;
 
     private enum Result {
@@ -246,6 +248,14 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 var[k + 1].INX = k;
             }
         }
+    }
+
+    private boolean timpForEach(Literal l, BiFunction<Literal, Literal, Boolean> f) {
+        for (int p = l.TIMP, i = 0; i < l.TSIZE; p = NEXT.get(p), ++i) {
+            Literal u = U.get(p), v = V.get(p);
+            if (!f.apply(u, v)) return false;
+        }
+        return true;
     }
 
     /**
@@ -393,9 +403,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private String timpToString(Literal l) {
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("  %3s -> ", l));
-        for (int i = 0, p = l.TIMP; i < l.TSIZE; i++, p = NEXT.get(p)) {
-            sb.append(U.get(p)).append('|').append(V.get(p)).append(' ');
-        }
+        timpForEach(l, (u, v) -> { sb.append(u).append('|').append(v).append(' '); return true; });
         return sb.toString();
     }
 
@@ -434,6 +442,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         start();
         final int N = VAR.length;
         Literal l = null;
+        int state = 2;
 
         TIntArrayList buf = new TIntArrayList();
 
@@ -632,8 +641,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 }
                 /* Steps 8 and 9 are in the method consider(). */
                 case 10:  // Accept real truths.
-                    if (tracing.contains(Trace.FIXING))
-                        log.trace("state 10 E=%d F=%d BRANCH[%d]=%d", E, F, d, BRANCH[d]);
                     F = E;
                     if (BRANCH[d] >= 0) {
                         ++d;
@@ -724,11 +731,13 @@ public class SATAlgorithmL extends AbstractSATSolver {
      * in Algorithm L.
      */
     class AlgorithmX {
+        private final AlgorithmY Y = new AlgorithmY();
         private final Variable[] CAND;  // candidate variables for algorithm X
         private int nCAND;  // Number of used entries in above array
         private final ArrayList<Literal> CANDL = new ArrayList<>();  // candidate literals
         private final Lookahead[] look;  // lookahead entries
         int S;  // number of valid look[] entries
+        int BASE;  // current base truth level (shared between algorithms X and Y
         private final Deque<Literal> W = new ArrayDeque<>();  // windfalls
 
         private final float alpha = 3.5f;
@@ -740,9 +749,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         private final float[] hprime;  // storage for refinement steps of heuristic score
         private final Heap<Variable> candidateHeap = new Heap<>();
         private final ConnectedComponents connectedComponents = new ConnectedComponents();
-        private float β = 0.999f, τ = 0;
-        private final int Y = 10;
-
 
         AlgorithmX() {
             nVariables = problem.nVariables();
@@ -1067,106 +1073,106 @@ public class SATAlgorithmL extends AbstractSATSolver {
             // X5 [Prepare to explore.]
 
             int Up = 0, jp = 0, j = 0;
-            int BASE = 2;  // Knuth sets BASE = 0 in F6, but sets BASE = 2 in sat11.w
+            BASE = 2;  // Knuth sets BASE = 0 in F6, but sets BASE = 2 in sat11.w
             Literal l = null, l0 = null;
             int xstate = 6;
             // Move to avoid allocation. When to reset this?
 
             STEP:
-            while (true) {
-                //System.out.printf("X in state %d. j = %d\n", xstate, j);
-                switch (xstate) {
-                    case 6: { // [Choose l for lookahead.]
-                        l = look[j].LL;
-                        T = BASE + look[j].LO;
-                        l.H = l.parent != null ? l.parent.H : 0;
-                        if (tracing.contains(Trace.LOOKAHEAD))
-                            log.trace("looking at %s @%d H=%.4g", l, T, l.H);
+            while (true) switch (xstate) {
+                case 6: { // [Choose l for lookahead.]
+                    l = look[j].LL;
+                    T = BASE + look[j].LO;
+                    l.H = l.parent != null ? l.parent.H : 0;
+                    if (tracing.contains(Trace.LOOKAHEAD))
+                        log.trace("looking at %s @%d H=%.4g", l, T, l.H);
 
-                        Fixity f = fixity(l);
-                        if (f == Fixity.UNFIXED) {
-                            xstate = 8;
-                            continue;
-                        }
-                        if (f == Fixity.FIXED_F && l.var.VAL < PT) {
-                            if (!X12(l.not)) {
-                                xstate = 13;
-                                continue;
-                            }
-                        }
-                    }
-                    /* fall through */
-                    case 7:  // [Move to next.]
-                        // System.out.printf("now state 7\n");
-                        if (FORCE.size() > Up) {
-                            Up = FORCE.size();
-                            jp = j;
-                        }
-                        ++j;
-                        if (j == S) {
-                            j = 0;
-                            BASE += 2 * S;
-                        }
-                        if (j == jp || j == 0 && BASE + 2 * S >= PT) return Result.LOOKAHEAD;
-                        xstate = 6;
+                    Fixity f = fixity(l);
+                    if (f == Fixity.UNFIXED) {
+                        xstate = 8;
                         continue;
-                    case 8: { // [Compute sharper heuristic.]
-                        //System.out.printf("now state 8...\n");
-                        l0 = l;
-                        if (!Perform72(l)) {
+                    }
+                    if (f == Fixity.FIXED_F && l.var.VAL < PT) {
+                        if (!X12(l.not)) {
                             xstate = 13;
                             continue;
                         }
-                        // Then...
-                        if (w > 0) {
-                            l0.H += w;
-                            // log.trace("** now H[%s] = %.4f after adding %.4f parent=%s", l0, l0.H, w, l0.parent);
-                            xstate = 10;
+                    }
+                }
+                /* fall through */
+                case 7:  // [Move to next.]
+                    // System.out.printf("now state 7\n");
+                    if (FORCE.size() > Up) {
+                        Up = FORCE.size();
+                        jp = j;
+                    }
+                    ++j;
+                    if (j == S) {
+                        j = 0;
+                        BASE += 2 * S;
+                    }
+                    if (j == jp || j == 0 && BASE + 2 * S >= PT) return Result.LOOKAHEAD;
+                    xstate = 6;
+                    continue;
+                case 8: { // [Compute sharper heuristic.]
+                    //System.out.printf("now state 8...\n");
+                    l0 = l;
+                    if (!Perform72(l)) {
+                        xstate = 13;
+                        continue;
+                    }
+                    // Then...
+                    if (w > 0) {
+                        l0.H += w;
+                        // log.trace("** now H[%s] = %.4f after adding %.4f parent=%s", l0, l0.H, w, l0.parent);
+                        xstate = 10;
+                        continue;
+                    }
+                }
+                case 9:  // [Exploit an autarky.]
+                    if (l0.H == 0) {
+                        if (tracing.contains(Trace.FIXING)) log.trace("autarky at %s\n", l0);
+                        if (!X12(l0)) {
+                            xstate = 13;
                             continue;
                         }
+                    } else {
+                        if (tracing.contains(Trace.FIXING)) log.trace(" autarky %s -> %s (%.4f)", l0.parent, l0, l0.H);
+                        // Generate the binary clause l0 | ~PARENT(l0)
+                        appendToBimp(l0.not, l0.parent.not);
+                        appendToBimp(l0.parent, l0);
                     }
-                    case 9:  // [Exploit an autarky.]
-                        if (l0.H == 0) {
-                            if (tracing.contains(Trace.FIXING)) log.trace("autarky at %s\n", l0);
-                            if (!X12(l0)) {
-                                xstate = 13;
-                                continue;
-                            }
-                        } else {
-                            if (tracing.contains(Trace.FIXING)) log.trace(" autarky %s -> %s (%.4f)", l0.parent, l0, l0.H);
-                            // Generate the binary clause l0 | ~PARENT(l0)
-                            appendToBimp(l0.not, l0.parent.not);
-                            appendToBimp(l0.parent, l0);
+                case 10:  // [Optionally look deeper.]
+                    if (useY) {
+                        Y.y(j, l0);
+                        if (tracing.contains(Trace.LOOKAHEAD)) log.trace("y is done");
+                    }
+                case 11:  // [Exploit necessary assignments.]
+                    List<Literal> bimp = l0.not.BIMP;
+                    // Knuth looks for these in reverse-BIMP order.
+                    for (int i = l0.not.BSIZE - 1; i >= 0; --i) {
+                        Literal u = bimp.get(i);
+                        Fixity f = fixity(u);
+                        if (f == Fixity.FIXED_T && u.var.VAL < PT) {
+                            if (tracing.contains(Trace.FIXING)) log.trace(" necessary %s", u);
+                            X12(u);
                         }
-                    case 10:  // [Optionally look deeper.]
-                        // y(j, l0);
-                    case 11:  // [Exploit necessary assignments.]
-                        List<Literal> bimp = l0.not.BIMP;
-                        // Knuth looks for these in reverse-BIMP order.
-                        for (int i = l0.not.BSIZE - 1; i >= 0; --i) {
-                            Literal u = bimp.get(i);
-                            Fixity f = fixity(u);
-                            if (f == Fixity.FIXED_T && u.var.VAL < PT) {
-                                if (tracing.contains(Trace.FIXING)) log.trace(" necessary %s", u);
-                                X12(u);
-                            }
+                    }
+                    xstate = 7;
+                    continue;
+                case 13:  // [Recover from conflict.]
+                    if (tracing.contains(Trace.LOOKAHEAD)) log.trace("lookahead conflict at %s", l0);
+                    if (T < PT) {
+                        l = l0.not;
+                        if (!X12(l)) {
+                            return Result.UNSAT;
                         }
                         xstate = 7;
                         continue;
-                    case 13:  // [Recover from conflict.]
-                        if (tracing.contains(Trace.LOOKAHEAD)) log.trace("lookahead conflict at %s", l0);
-                        if (T < PT) {
-                            l = l0.not;
-                            if (!X12(l)) {
-                                return Result.UNSAT;
-                            }
-                            xstate = 7;
-                            continue;
-                        }
-                        return Result.UNSAT;  // we have discovered a contradiction
-                    default:
-                        throw new IllegalStateException();
-                }
+                    }
+                    return Result.UNSAT;  // we have discovered a contradiction
+                default:
+                    throw new IllegalStateException();
             }
         }
 
@@ -1240,28 +1246,135 @@ public class SATAlgorithmL extends AbstractSATSolver {
             return true;
         }
 
-        private void y(final int j, final Literal l0) {
-            // Y1. [Filter.]
-            if (l0.DFAIL == ISTAMP || T + 2 * S * (Y+1) > PT) return;
-            if (l0.H <= τ) {
-                τ *= β;
-                return;
 
+        class AlgorithmY {
+            private float β = 0.999f, τ = 0;
+            private final int Y = 10;
+            private Literal l0hat;
+            private int jhat, jhatp;  // XXX consider folding Y7 and making these local
+            private int DT;
+
+            private boolean y(final int j, final Literal l0) {
+                // Y1. [Filter.]
+                // XXX knuth: also returns if level == 0
+                if (l0.DFAIL == ISTAMP || T + 2 * S * (Y+1) > PT) return true; /* XXX: we didn't do anything */
+                if (l0.H <= τ) {
+                    τ *= β;
+                    return true; /* XXX is this the right thing to return when we don't do anything */
+
+                }
+                // Y2. [Initialize.]
+                int LBASE;
+                if (false)  {
+                    // the knuth form of the settings.
+                    BASE = T-2;
+                    LBASE = BASE + 2*S*Y;
+                    DT = LBASE + look[j].LO;
+                } else {
+                    LBASE = T + 2*S*Y;
+                    DT = LBASE + T - BASE;
+                    BASE = T;
+                }
+                if (tracing.contains(Trace.LOOKAHEAD)) log.trace("BASE %d LBASE %d DT %d", BASE, LBASE, DT);
+                jhat = jhatp = 0;
+                // Warning: Knuth has it LBASE+T-BASE.
+                // also BASE=CS
+                E = F;
+                // CONFLICT = Y8
+                int oldT = T;
+                T = DT;
+                propagate(l0);
+                T = oldT; // is this necessary since we're about to enter state 3 XXX
+                Literal l = null;
+                int ystate = 3;
+                // Y3. [Choose l for double look.]
+                while (true) switch (ystate) {
+                    case 3:  // Y3. [Choose l for double look.]
+                        l = look[jhat].LL;  // XXX in Knuth these are j, not jhat
+                        T = BASE + look[jhat].LO;  // XXX ditto
+                        if (tracing.contains(Trace.LOOKAHEAD)) log.trace("dlooking at %s (%d)", l, T);
+                        Fixity fl = fixity(l);
+                        if (fl == Fixity.UNFIXED) {
+                            ystate = 5;
+                            continue;
+                        }
+                        // If l is fixed but not Dfalse...
+                        if (fl == Fixity.FIXED_F && l.var.VAL < DT) Y7(l.not);
+                    case 4:  // Y4. [Move to next.]
+                        ++jhat;
+                        if (jhat == S) {
+                            jhat = 0;
+                            BASE += 2 * S;
+                        }
+                        ystate = (jhatp == jhat || jhat == 0 && BASE == LBASE) ? 6 : 3;
+                        continue;
+                    case 5:  // Y5. [Look ahead.]
+                        ystate = !Perform73(l) ? 8 : 4;
+                        continue;
+                    case 6:  // Y6. [Finish.]
+                        while (!W.isEmpty()) {
+                            final Literal w = W.pop();
+                            if (tracing.contains(Trace.LOOKAHEAD)) log.trace("windfall %s->%s", l, w);
+                            newBinaryClause(l0.not, w);
+                        }
+                        BASE = LBASE;
+                        T = DT;
+                        τ = l0.H;
+                        l0.DFAIL = ISTAMP;
+                        if (tracing.contains(Trace.LOOKAHEAD)) log.trace("y came back, now T is %d", T);
+
+                        return true;
+                    case 8:  // Y8. [Recover from conflict.]
+                        if (T < DT) {
+                            if (!Y7(look[jhat].LL.not)) {
+                                log.trace("y7 failed during recovery. could that provoke a loop?");
+                                continue;
+                            }
+                            ystate = 4;
+                            continue;
+                        }
+                        log.trace("Y8 bailing with prejudice");
+                        return false; // exit to step X13
+                }
             }
-            // Y2. [Initialize.]
-            int BASE = T-2;
-            int LBASE = BASE + 2*S*Y;
-            int DT = LBASE + look[j].LO;
-            int i = 0, jhatp = 0, jhat = 0;
-            E = F;
-            // CONFLICT = Y8
-            int oldT = T;
-            T = DT;
-            if (!propagate(l0)) {
-                // recover from conflict (Y8)
-                // left off here
+            /** Y7. [Make l0hat false.] */
+            private boolean Y7(Literal l) {
+                // where we left off: the invocations of Y7 vs. knuth's data in sat11.w make for
+                // a tricky proposition vs l0hat and all that.
+                jhatp = jhat;
+                int Tp = T;
+                T = DT;
+                //if (!Perform73(l0hat)) return false;
+                if (!Perform73(l)) return false;
+                T = Tp;
+                W.push(l);  // was: l0hat (but perform73 will have established that XXX)
+                return true;
+            }
+
+            private boolean Perform73(Literal l) {
+                l0hat = l;
+                G = E = F;
+                if (!propagate(l)) return false;
+                while (G < E) {
+                    Literal L = R[G];
+                    ++G;
+                    if (!timpForEach(L, (u, v) -> dlTakeAccountOf(L, u, v))) return false;
+                }
+                return true;
+            }
+
+            private boolean dlTakeAccountOf(Literal L, Literal u, Literal v) {
+                if (tracing.contains(Trace.FIXING)) log.trace("  dlooking %s->%s|%s", L, u, v);
+                Fixity fu = fixity(u), fv = fixity(v);
+                if (fu == Fixity.FIXED_F && fv == Fixity.FIXED_F) return false;
+                else if (fu == Fixity.FIXED_F && fv == Fixity.UNFIXED) { if (!propagate(v)) return false; }
+                else if (fu == Fixity.UNFIXED && fv == Fixity.FIXED_F) { if (!propagate(u)) return false; }
+                // the cases that remain: u and v are both unfixed, or at least one is fixed true: do nothing.
+                return true;
             }
         }
+
+
     }
 
 

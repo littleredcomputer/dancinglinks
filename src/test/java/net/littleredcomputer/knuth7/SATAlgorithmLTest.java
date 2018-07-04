@@ -22,6 +22,11 @@ public class SATAlgorithmLTest extends SATTestBase {
         a.useX = false;
         return a;
     };
+    private Function<SATProblem, AbstractSATSolver> L3NoY = p -> {
+        SATAlgorithmL a = new SATAlgorithmL(p.to3SAT());
+        a.useY = false;
+        return a;
+    };
 
     @Test public void ex6() { testEx6With(L); }
     @Test public void ex7() { testEx7With(L); }
@@ -30,6 +35,7 @@ public class SATAlgorithmLTest extends SATTestBase {
     @Test public void w3_3_noX() { assertThat(waerden(3, 3, L3NoX), is(9)); }
     @Test public void w3_4() { assertThat(waerden(3, 4, L3), is(18)); }
     @Test public void w3_4_noX() { assertThat(waerden(3, 4, L3NoX), is(18)); }
+    @Test public void w3_4_noY() { assertThat(waerden(3, 4, L3NoY), is(18)); }
     @Test public void w4_3() { assertThat(waerden(4, 3, L3), is(18)); }
     @Test public void w4_4() { assertThat(waerden(4, 4, L3), is(35)); }
     @Test public void w3_6() { assertThat(waerden(3, 6, L3), is(32)); }
@@ -47,7 +53,7 @@ public class SATAlgorithmLTest extends SATTestBase {
 
 
     // This one still takes a long time
-    @Test public void rand3_2062_500_314_L() { assertUNSAT(SATProblem.randomInstance(3, 2062, 500, 314), L); }
+    /* @Test */ public void rand3_2062_500_314_L() { assertUNSAT(SATProblem.randomInstance(3, 2062, 500, 314), L); }
 
     @Test public void w_3_4_17() {
         SATProblem p = SATProblem.waerden(3,4,17);
@@ -61,9 +67,27 @@ public class SATAlgorithmLTest extends SATTestBase {
         assertThat(a.track(), is("[~9, 15, ~15, 9, ~8, 8, ~7, null, null]"));
     }
 
+    @Test public void w_3_4_17_noY() {
+        SATProblem p = SATProblem.waerden(3,4,17);
+        SATAlgorithmL a = new SATAlgorithmL(p.to3SAT());
+        a.useY = false;
+        a.trackChoices = true;
+        assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
+        assertThat(a.track(), is("[~9, 15, ~15, 9, ~8, 8, ~7, null, null]"));
+    }
+
     @Test public void rand3_420_100_0_L() {
         SATAlgorithmL a = new SATAlgorithmL(rand3_420_100_0);
         a.trackChoices = true;
+        assertThat(a.solve().map(rand3_420_100_0::evaluate), isEmpty());
+        assertThat(a.track(), is("[3, 42, ~84, 61, 52, ~52, ~26, 26, ~61, 84, ~11, 40, ~40, 11," +
+                " ~14, 14, ~42, ~6, 40, 4, 52, 65, ~65, ~52, ~4, ~40, 6, 2, ~2, ~3, ~94, 94]"));
+    }
+
+    @Test public void rand3_420_100_0_LnoY() {
+        SATAlgorithmL a = new SATAlgorithmL(rand3_420_100_0);
+        a.trackChoices = true;
+        a.useY = false;
         assertThat(a.solve().map(rand3_420_100_0::evaluate), isEmpty());
         assertThat(a.track(), is("[3, 42, ~84, 61, 52, ~52, ~26, 26, ~61, 84, ~11, 40, ~40, 11," +
                 " ~14, 14, ~42, ~6, 40, 4, 52, 65, ~65, ~52, ~4, ~40, 6, 2, ~2, ~3, ~94, 94]"));
@@ -97,10 +121,11 @@ public class SATAlgorithmLTest extends SATTestBase {
         SATAlgorithmL a = new SATAlgorithmL(p.to3SAT());
         assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
     }
-    @Test public void lx_w339() { assertThat(solveWith(L).apply(SATProblem.waerden(3, 3, 9)), isEmpty()); }
+    @Test public void w338() { assertThat(solveWith(L).apply(SATProblem.waerden(3, 3, 8)), isPresentAndIs(true)); }
+    @Test public void w339() { assertThat(solveWith(L).apply(SATProblem.waerden(3, 3, 9)), isEmpty()); }
     @Test public void rand_3_135_32_0() { assertThat(solveWith(L).apply(SATProblem.randomInstance(3, 135, 32, 0)), isEmpty()); }
     @Test public void rand_3_300_64_0() { assertThat(solveWith(L).apply(SATProblem.randomInstance(3, 300, 64, 0)), isEmpty()); }
-    @Test public void lx_w339_noX() { assertThat(solveWith(L3NoX).apply(SATProblem.waerden(3, 3, 9)), isEmpty()); }
+    @Test public void w339_noX() { assertThat(solveWith(L3NoX).apply(SATProblem.waerden(3, 3, 9)), isEmpty()); }
     @Test public void rand_3_135_32_0_noX() { assertThat(solveWith(L3NoX).apply(SATProblem.randomInstance(3, 135, 32, 0)), isEmpty()); }
     @Test public void rand_3_300_64_0_noX() { assertThat(solveWith(L3NoX).apply(SATProblem.randomInstance(3, 300, 64, 0)), isEmpty()); }
 
