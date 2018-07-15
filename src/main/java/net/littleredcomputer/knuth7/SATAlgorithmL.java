@@ -122,8 +122,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
     private enum Trace {STEP, SEARCH, LOOKAHEAD, BIMP, SCORE, FIXING, FOREST}
 
-    // EnumSet<Trace> tracing = EnumSet.noneOf(Trace.class);
-    EnumSet<Trace> tracing = EnumSet.of(Trace.FIXING, Trace.LOOKAHEAD);
+    EnumSet<Trace> tracing = EnumSet.noneOf(Trace.class);
+    // EnumSet<Trace> tracing = EnumSet.of(Trace.FIXING, Trace.LOOKAHEAD);
     private AlgorithmX x = null;
 
     private enum Result {
@@ -1326,14 +1326,10 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         return true;
                     case 8:  // Y8. [Recover from conflict.]
                         if (T < DT) {
-                            if (!Y7(look[jhat].LL.not)) {
-                                log.trace("y7 failed during recovery. could that provoke a loop?");
-                                continue;
-                            }
+                            if (!Y7(look[jhat].LL.not)) continue;
                             ystate = 4;
                             continue;
                         }
-                        log.trace("Y8 bailing with prejudice");
                         return false; // exit to step X13
                 }
             }
