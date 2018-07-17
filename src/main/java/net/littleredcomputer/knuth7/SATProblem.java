@@ -22,6 +22,18 @@ public class SATProblem {
     private int nLiterals = 0;
     private int height = 0;
 
+    class Builder {
+        private int variableCount = 0;
+        private HashMap<String, Integer> variables = new HashMap<>();
+        private List<List<Integer>> clauses = new ArrayList<>();
+
+        int variableIndex(String variableName) {
+            if (variables.containsKey(variableName)) return variables.get(variableName);
+            variables.put(variableName, variableCount);
+            return variableCount++;
+        }
+    }
+
     // TODO: make private when we switch to the builder pattern.
     // The builder pattern ought also to allow named variables.
     SATProblem(int nVariables) {

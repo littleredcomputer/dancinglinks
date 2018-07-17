@@ -120,7 +120,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     boolean useY = true;  // whether to use algorithm Y for double-lookahead
     boolean knuthCompatible = true;
 
-    private enum Trace {STEP, SEARCH, LOOKAHEAD, BIMP, SCORE, FIXING, FOREST}
+    enum Trace {STEP, SEARCH, LOOKAHEAD, BIMP, SCORE, FIXING, FOREST}
 
     EnumSet<Trace> tracing = EnumSet.noneOf(Trace.class);
     // EnumSet<Trace> tracing = EnumSet.of(Trace.FIXING, Trace.LOOKAHEAD);
@@ -457,6 +457,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     BRANCH[d] = -1;
                     if (tracing.contains(Trace.SEARCH))
                         log.trace("New node at level %d. BRANCH[%d] is %d.", d, d, BRANCH[d]);
+                    if (tracing.contains(Trace.BIMP)) print();
                     ++nodeCount;
                     if (FORCE.isEmpty() && F < N && useX) {
                         switch (x.X()){
@@ -485,7 +486,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     // /* explain why this is way down here */ BRANCH[d] = -1;
                     //BRANCH[d]=-1;//XXX
                     SIGL = d;
-                    if (tracing.contains(Trace.BIMP)) print();
                 case 3: {  // Choose l.
                     if (useX) {
                         // Exercise 168 says:
@@ -1144,7 +1144,11 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     }
                 case 10:  // [Optionally look deeper.]
                     if (useY) {
-                        Y.y(j, l0);
+                        if (!Y.y(j, l0)) {
+                            if (tracing.contains(Trace.LOOKAHEAD)) log.trace("y is done, and returned false, so off to step 13");
+                            xstate = 13;
+                            continue;
+                        }
                         if (tracing.contains(Trace.LOOKAHEAD)) log.trace("y is done");
                     }
                 case 11:  // [Exploit necessary assignments.]
@@ -1335,15 +1339,12 @@ public class SATAlgorithmL extends AbstractSATSolver {
             }
             /** Y7. [Make l0hat false.] */
             private boolean Y7(Literal l) {
-                // where we left off: the invocations of Y7 vs. knuth's data in sat11.w make for
-                // a tricky proposition vs l0hat and all that.
                 jhatp = jhat;
                 int Tp = T;
                 T = DT;
-                //if (!Perform73(l0hat)) return false;
                 if (!Perform73(l)) return false;
                 T = Tp;
-                W.push(l);  // was: l0hat (but perform73 will have established that XXX)
+                W.push(l);
                 return true;
             }
 

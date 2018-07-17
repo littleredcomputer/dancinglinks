@@ -4,6 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.junit.Test;
 
+import java.util.EnumSet;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -59,6 +60,15 @@ public class SATAlgorithmLTest extends SATTestBase {
         SATProblem p = SATProblem.waerden(3,4,17);
         SATAlgorithmL a = new SATAlgorithmL(p.to3SAT());
         a.trackChoices = true;
+        a.tracing = EnumSet.of(
+                SATAlgorithmL.Trace.SEARCH,
+                SATAlgorithmL.Trace.FIXING,
+                SATAlgorithmL.Trace.LOOKAHEAD,
+                SATAlgorithmL.Trace.FOREST,
+                SATAlgorithmL.Trace.SCORE,
+                SATAlgorithmL.Trace.BIMP
+        );
+
         assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
         // This is sort of delicate but getting all the computations working in the same way
         // Knuth's model implementation does took a lot of effort. The sequence of variable choices,
@@ -136,6 +146,14 @@ public class SATAlgorithmLTest extends SATTestBase {
             log.info("Random SAT test %d %d %d %d -> %s", k, m, n, i, a.map(b -> b ? "SAT" : "BROKEN").orElse("UNSAT"));
             assertThat(a, is(either(isPresentAndIs(true)).or(isEmpty())));
         }
+    }
+
+    /* a minimal example I used to chase a bug. */
+    @Test public void rand_3_13_7_617() {
+        SATProblem p = SATProblem.randomInstance(3, 13, 7, 617);
+        SATAlgorithmL a = new SATAlgorithmL(p);
+        a.tracing = EnumSet.allOf(SATAlgorithmL.Trace.class);
+        assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
     }
 
     @Test public void manySmallRandomInstances() {

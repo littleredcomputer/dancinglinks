@@ -103,12 +103,13 @@ public class SATProblemTest extends SATTestBase {
 
     @Test
     public void smallRandomTestAgreement() {
-        for (int seed = 0; seed < 100; ++seed) {
-            SATProblem p = SATProblem.randomInstance(3, 42, 10, seed);
+        for (int seed = 0; seed < 1000; ++seed) {
+            SATProblem p = SATProblem.randomInstance(3, 13, 7, seed);
             // Partition the results of the various algorithms into equivalence classes. There can be only one.
             // We confess, however, that we are only testing that all the algorithms agree on the satisfiability
             // of the random problems and not the satisfying assignments themselves (of which there may be more
             // than one for satisfiable instances: different algorithms may find different variable assignments).
+            System.out.printf("trying seed %d\n", seed);
             assertThat(algorithms.stream().map(a -> a.apply(p).map(p::evaluate))
                     .collect(Collectors.collectingAndThen(toSet(), Set::size)), is(1));
         }
