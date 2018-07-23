@@ -4,7 +4,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.junit.Test;
 
-import java.util.EnumSet;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -29,10 +28,8 @@ public class SATAlgorithmLTest extends SATTestBase {
         return a;
     };
 
-    @Test public void ex6() { testEx6With(L); }
-    @Test public void ex7() { testEx7With(L); }
-
     @Test public void w3_3() { assertThat(waerden(3, 3, L), is(9)); }
+
     @Test public void w3_3_noX() { assertThat(waerden(3, 3, L3NoX), is(9)); }
     @Test public void w3_4() { assertThat(waerden(3, 4, L3), is(18)); }
     @Test public void w3_4_noX() { assertThat(waerden(3, 4, L3NoX), is(18)); }
@@ -40,17 +37,28 @@ public class SATAlgorithmLTest extends SATTestBase {
     @Test public void w4_3() { assertThat(waerden(4, 3, L3), is(18)); }
     @Test public void w4_4() { assertThat(waerden(4, 4, L3), is(35)); }
     @Test public void w3_6() { assertThat(waerden(3, 6, L3), is(32)); }
+    @Test public void w3_7() { assertThat(waerden(3, 7, L3), is(46)); }
+    @Test public void w3_8() { assertThat(waerden(3, 8, L3), is(58)); }
     @Test public void w4_5() { assertThat(waerden(4, 5, L3), is(55)); }
     @Test public void w5_4() { assertThat(waerden(5, 4, L3), is(55)); }
     @Test public void w6_3() { assertThat(waerden(6, 3, L3), is(32)); }
+    @Test public void w7_3() { assertThat(waerden(7, 3, L3), is(46)); }
+    @Test public void w8_3() { assertThat(waerden(8, 3, L3), is(58)); }
+    // These are do-able with L3, but take around 30s
+    /* @Test */ public void w6_4() { assertThat(waerden(6, 4, L3), is(73)); }
+    /* @Test */ public void w4_6() { assertThat(waerden(4, 6, L3), is(73)); }
 
-    @Test public void langford() { testLangfordWith(L3); }
     @Test public void hole6() { testHole6With(L3); }
     @Test public void dubois() { testDuboisWith(L); }
     @Test public void testQueen5() { testQueen5With(L3); }
     @Test public void testMutex4BitsL1() { testMutex4BitsL1With(L3); }
     @Test public void testZebra() { testZebraWith(L3); }
     @Test public void testQuinn() { testQuinnWith(L); }
+    @Test public void ex6() { testEx6With(L); }
+    @Test public void ex7() { testEx7With(L); }
+    @Test public void rand3_1061_L() { testRand3_1061With(L); }
+    @Test public void rand3_1062_L() { testRand3_1062With(L); }
+    @Test public void langford() { testLangfordWith(L3); }
 
 
     // This one still takes a long time
@@ -60,21 +68,12 @@ public class SATAlgorithmLTest extends SATTestBase {
         SATProblem p = SATProblem.waerden(3,4,17);
         SATAlgorithmL a = new SATAlgorithmL(p.to3SAT());
         a.trackChoices = true;
-        a.tracing = EnumSet.of(
-                SATAlgorithmL.Trace.SEARCH,
-                SATAlgorithmL.Trace.FIXING,
-                SATAlgorithmL.Trace.LOOKAHEAD,
-                SATAlgorithmL.Trace.FOREST,
-                SATAlgorithmL.Trace.SCORE,
-                SATAlgorithmL.Trace.BIMP
-        );
-
         assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
         // This is sort of delicate but getting all the computations working in the same way
         // Knuth's model implementation does took a lot of effort. The sequence of variable choices,
         // backtrack points etc. are sensitive to the details of the implementation. This sequence
         // has been hand-checked to correspond with sat11.w's choices.
-        assertThat(a.track(), is("[~9, 15, ~15, 9, ~8, 8, ~7, null, null]"));
+        assertThat(a.track(), is("[~9, 9, ~8, 8, null, null]"));
     }
 
     @Test public void w_3_4_17_noY() {
@@ -90,8 +89,7 @@ public class SATAlgorithmLTest extends SATTestBase {
         SATAlgorithmL a = new SATAlgorithmL(rand3_420_100_0);
         a.trackChoices = true;
         assertThat(a.solve().map(rand3_420_100_0::evaluate), isEmpty());
-        assertThat(a.track(), is("[3, 42, ~84, 61, 52, ~52, ~26, 26, ~61, 84, ~11, 40, ~40, 11," +
-                " ~14, 14, ~42, ~6, 40, 4, 52, 65, ~65, ~52, ~4, ~40, 6, 2, ~2, ~3, ~94, 94]"));
+        assertThat(a.track(), is("[3, 42, ~84, 52, ~52, 84, ~11, 11, ~42, 40, ~40, ~3, 63, 34, 2, ~2, ~34, ~63]"));
     }
 
     @Test public void rand3_420_100_0_LnoY() {
@@ -105,6 +103,21 @@ public class SATAlgorithmLTest extends SATTestBase {
 
     @Test public void w_4_4_35() {
         assertThat(solveWith(L3).apply(SATProblem.waerden(4, 4, 35)), isEmpty());
+    }
+    @Test public void w_4_4_34() {
+        SATProblem p = SATProblem.waerden(4, 4, 34).to3SAT();
+        SATAlgorithmL a = new SATAlgorithmL(p);
+        a.useY = true;
+        assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
+    }
+
+    @Test public void w_4_4_35d() {
+        assertThat(solveWith(SATAlgorithmD::new).apply(SATProblem.waerden(4, 4, 35)), isEmpty());
+    }
+    @Test public void w_4_4_34d() {
+        SATProblem p = SATProblem.waerden(4, 4, 34).to3SAT();
+        SATAlgorithmD a = new SATAlgorithmD(p);
+        assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
     }
 
     // This passes, but takes ~ 4 minutes */
@@ -152,7 +165,6 @@ public class SATAlgorithmLTest extends SATTestBase {
     @Test public void rand_3_13_7_617() {
         SATProblem p = SATProblem.randomInstance(3, 13, 7, 617);
         SATAlgorithmL a = new SATAlgorithmL(p);
-        a.tracing = EnumSet.allOf(SATAlgorithmL.Trace.class);
         assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
     }
 
@@ -174,7 +186,4 @@ public class SATAlgorithmLTest extends SATTestBase {
         //a.stopAtStep = 1;
         a.solve();
     }
-
-    @Test public void rand3_1061_L() { testRand3_1061With(L); }
-    @Test public void rand3_1062_L() { testRand3_1062With(L); }
 }

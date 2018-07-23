@@ -102,8 +102,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private final Stack<Literal> ISTACKb = new Stack<>();  // stack of literals
     private final TIntStack ISTACKs = new TIntArrayStack();  // stack of BIMP table sizes for corresponding literals above
     private int T = NT;  // truth degree (F6 7.2.2.2 p. 37)
-    // Where we left off: the value of T is being set to an unexpected value by the lookahead code.
-    // we need it restored to the outer truth level when we get back.
     private int E = 0;  // literals R[k] are "nearly true" for G <= k < E.
     private int F = 0;
     private int G = 0;
@@ -475,9 +473,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         log.info("!SAT!");
                         return solution();
                     }
-                    // Where we left off: Alg. X has returned with force data; we got here just after bumping d; we go off to state 5 without
-                    // making an entry in the BACKF array for this level!!!!!
-
                     if (FORCE.size() > 0) {
                         if (tracing.contains(Trace.STEP)) log.trace("FORCE not empty, so going to step 5.", FORCE);
                         state = 5;
@@ -681,7 +676,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         }
                         X.VAL = 0;
                     }
-                    if (tracing.contains(Trace.BIMP)) log.trace("done with a suppression cycle");
                 case 13:  // Downdate BIMPs
                     if (BRANCH[d] >= 0) {
                         while (ISTACKb.size() > BACKI[d]) {
@@ -1260,21 +1254,21 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
             private boolean y(final int j, final Literal l0) {
                 // Y1. [Filter.]
-                // XXX knuth: also returns if level == 0
-                if (l0.DFAIL == ISTAMP || T + 2 * S * (Y+1) > PT) return true; /* XXX: we didn't do anything */
+                // XXX in the fascicle, d == 0 is not a condition, but should be according to sat11.w
+                if (d == 0 || l0.DFAIL == ISTAMP || T + 2 * S * (Y+1) > PT) return true; /* XXX: we didn't do anything */
                 if (l0.H <= τ) {
                     τ *= β;
                     return true; /* XXX is this the right thing to return when we don't do anything */
-
                 }
                 // Y2. [Initialize.]
                 int LBASE;
                 if (false)  {
-                    // the knuth form of the settings.
+                    // the knuth fascicle form of the settings.
                     BASE = T-2;
                     LBASE = BASE + 2*S*Y;
                     DT = LBASE + look[j].LO;
                 } else {
+                    // the sat11.w form of the settings
                     LBASE = T + 2*S*Y;
                     DT = LBASE + T - BASE;
                     BASE = T;
@@ -1287,7 +1281,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 // CONFLICT = Y8
                 int oldT = T;
                 T = DT;
-                propagate(l0);
+                if (!propagate(l0)) throw new IllegalStateException("uh oh: initial propagate at level DT led to contra");
                 T = oldT; // is this necessary since we're about to enter state 3 XXX
                 Literal l = null;
                 int ystate = 3;
@@ -1319,7 +1313,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         while (!W.isEmpty()) {
                             final Literal w = W.pop();
                             if (tracing.contains(Trace.LOOKAHEAD)) log.trace("windfall %s->%s", l, w);
-                            newBinaryClause(l0.not, w);
+                            boolean oo = newBinaryClause(l0.not, w);
+                            if (!oo) throw new IllegalStateException("nbc return false in Y??");
                         }
                         BASE = LBASE;
                         T = DT;
@@ -1334,6 +1329,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                             ystate = 4;
                             continue;
                         }
+                        BASE = LBASE; /* XXX is this in knuth? it is in sat11.w in "Recover from a double lookahead contradiction" */
                         return false; // exit to step X13
                 }
             }
@@ -1370,10 +1366,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 return true;
             }
         }
-
-
     }
-
 
     private String truthName(int t) {
         if (t >= RT) return "real";
@@ -1388,6 +1381,3 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private boolean isfixed(Literal l) { return l.var.VAL >= T; }
     String track() { return track.toString(); }
 }
-
-// where we left off: bimp divergence at ~6 (we have 3, 12, ~48, but in K the last of these is not present.
-// where did it come from? Without "bimp accuracy" nothing else will work

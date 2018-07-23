@@ -48,15 +48,6 @@ public class SATTestBase {
     void testEx7With(Function<SATProblem, AbstractSATSolver> a) { assertSAT(ex7, a); }
     void testRand3_1061With(Function<SATProblem, AbstractSATSolver> a) { assertSAT(rand3_1061, a); }
     void testRand3_1062With(Function<SATProblem, AbstractSATSolver> a) { assertUNSAT(rand3_1062, a); }
-
-    void assertSAT(SATProblem p, Function<SATProblem, AbstractSATSolver> a) {
-        Assert.assertThat(a.apply(p).solve().map(p::evaluate), OptionalMatchers.isPresentAndIs(true));
-    }
-
-    void assertUNSAT(SATProblem p, Function<SATProblem, AbstractSATSolver> a) {
-        Assert.assertThat(a.apply(p).solve(), OptionalMatchers.isEmpty());
-    }
-
     void testLangfordWith(Function<SATProblem, AbstractSATSolver> a) {
         Supplier<IntStream> range = () -> IntStream.range(2, 10);
         // The langford problem is solvable iff i mod 4 in {0, 3}. When it is solvable, we should expect the
@@ -72,6 +63,14 @@ public class SATTestBase {
                     .map(bs -> bs.stream().mapToInt(b -> b ? 1 : 0).sum());
         });
         Assert.assertThat(observed.collect(toList()), CoreMatchers.is(expected));
+    }
+
+    void assertSAT(SATProblem p, Function<SATProblem, AbstractSATSolver> a) {
+        Assert.assertThat(a.apply(p).solve().map(p::evaluate), OptionalMatchers.isPresentAndIs(true));
+    }
+
+    void assertUNSAT(SATProblem p, Function<SATProblem, AbstractSATSolver> a) {
+        Assert.assertThat(a.apply(p).solve(), OptionalMatchers.isEmpty());
     }
 
     int waerden(int j, int k, Function<SATProblem, AbstractSATSolver> solver) {

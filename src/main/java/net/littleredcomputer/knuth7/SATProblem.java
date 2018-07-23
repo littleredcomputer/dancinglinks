@@ -22,15 +22,40 @@ public class SATProblem {
     private int nLiterals = 0;
     private int height = 0;
 
-    class Builder {
-        private int variableCount = 0;
-        private HashMap<String, Integer> variables = new HashMap<>();
-        private List<List<Integer>> clauses = new ArrayList<>();
+    static class NamedVariableBuilder {
+        private int nextVariableIndex = 1;
+        final private HashMap<String, Integer> variables = new HashMap<>();
+        final private List<List<Integer>> clauses = new ArrayList<>();
+        final private Pattern negated;
 
-        int variableIndex(String variableName) {
-            if (variables.containsKey(variableName)) return variables.get(variableName);
-            variables.put(variableName, variableCount);
-            return variableCount++;
+        NamedVariableBuilder(Pattern negated) {
+            this.negated = negated;
+        }
+
+        private int variableIndex(String variable) {
+            if (variables.containsKey(variable)) return variables.get(variable);
+            variables.put(variable, nextVariableIndex);
+            return nextVariableIndex++;
+        }
+
+        void addClause(Iterable<String> literals) {
+            List<Integer> clause = new ArrayList<>();
+            for (String literal : literals) {
+                Matcher m = negated.matcher(literal);
+                if (m.find()) {
+                    String stem = m.replaceAll("");
+                    clause.add(-variableIndex(stem));
+                } else {
+                    clause.add(variableIndex(literal));
+                }
+            }
+            clauses.add(clause);
+        }
+
+        SATProblem build() {
+            SATProblem p = new SATProblem(nextVariableIndex-1);
+            clauses.forEach(p::addClause);
+            return p;
         }
     }
 
@@ -44,11 +69,15 @@ public class SATProblem {
     int nClauses() {
         return clauses.size();
     }
-    List<List<Integer>> encodedClauses() { return Collections.unmodifiableList(clauses); }
+
+    List<List<Integer>> encodedClauses() {
+        return Collections.unmodifiableList(clauses);
+    }
 
     public int nVariables() {
         return nVariables;
     }
+
     public int nLiterals() {
         return nLiterals;
     }
@@ -76,10 +105,10 @@ public class SATProblem {
         return sign * (literal >> 1);
     }
 
-    // TODO: creating a builder class would go a long way toward cleaning up the creation logic.
-
     void addClause(Iterable<Integer> literals) {
-        List<Integer> clause = StreamSupport.stream(literals.spliterator(), false).map(SATProblem::encodeLiteral).collect(Collectors.collectingAndThen(toList(), Collections::unmodifiableList));
+        List<Integer> clause = StreamSupport.stream(literals.spliterator(), false)
+                .map(SATProblem::encodeLiteral)
+                .collect(Collectors.collectingAndThen(toList(), Collections::unmodifiableList));
         final int s = clause.size();
         nLiterals += s;
         clauses.add(clause);
@@ -101,6 +130,7 @@ public class SATProblem {
 
     /**
      * Evaluate the boolean function represented by the problem's clauses at the specified point
+     *
      * @param p (point (i.e., vector of booleans) at which to evaluate
      * @return the truth value of this problem at p
      */
@@ -150,30 +180,17 @@ public class SATProblem {
         return p;
     }
 
-    public static SATProblem parseKnuth(String s) { return parseKnuth(new StringReader(s)); }
+    public static SATProblem parseKnuth(String s) {
+        return parseKnuth(new StringReader(s));
+    }
+
     public static SATProblem parseKnuth(Reader r) {
-        HashMap<String, Integer> varMap = new HashMap<>();
-        List<List<Integer>> clauses = new ArrayList<>();
+        NamedVariableBuilder builder = new NamedVariableBuilder(Pattern.compile("^~"));
         new BufferedReader(r).lines()
                 .filter(s -> !s.startsWith("~ "))
-                .forEach(line -> {
-                    List<Integer> clause = new ArrayList<>();
-                    for (String lit : splitter.split(line)) {
-                        boolean negated = false;
-                        if (lit.startsWith("~")) {
-                            negated = true;
-                            lit = lit.substring(1);
-                        }
-                        if (!varMap.containsKey(lit)) {
-                            varMap.put(lit, varMap.size() + 1);
-                        }
-                        clause.add(varMap.get(lit) * (negated ? -1 : 1));
-                    }
-                    clauses.add(clause);
-                });
-        SATProblem p = new SATProblem(varMap.size());
-        clauses.forEach(p::addClause);
-        return p;
+                .map(splitter::split)
+                .forEach(builder::addClause);
+        return builder.build();
     }
 
     /**
@@ -182,6 +199,7 @@ public class SATProblem {
      * variables. Any new variables created will be assigned numbers just beyond those
      * in the original problem. If the original problem is already 3-SAT, we merely return
      * the original instance, no copy is made.
+     *
      * @return An equivalent problem in 3-SAT.
      */
     public SATProblem to3SAT() {
@@ -350,7 +368,7 @@ public class SATProblem {
         for (int i = 0; i < nClauses(); ++i) {
             List<Integer> c = getClause(i);
             for (int l : c) {
-                p.printf("%s%d ", l < 0 ? "~": "", Math.abs(l));
+                p.printf("%s%d ", l < 0 ? "~" : "", Math.abs(l));
             }
             p.println();
         }
