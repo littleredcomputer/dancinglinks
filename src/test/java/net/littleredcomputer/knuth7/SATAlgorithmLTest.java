@@ -111,32 +111,8 @@ public class SATAlgorithmLTest extends SATTestBase {
         assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
     }
 
-    @Test public void w_4_4_35d() {
-        assertThat(solveWith(SATAlgorithmD::new).apply(SATProblem.waerden(4, 4, 35)), isEmpty());
-    }
-    @Test public void w_4_4_34d() {
-        SATProblem p = SATProblem.waerden(4, 4, 34).to3SAT();
-        SATAlgorithmD a = new SATAlgorithmD(p);
-        assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
-    }
-
-    // This passes, but takes ~ 4 minutes */
-    /* @Test */ public void w_4_4_35_LnoX() { assertThat(solveWith(L3NoX).apply(SATProblem.waerden(4, 4, 35)), isEmpty()); }
-
-    // langford9 under noX revealed a bug with no-branch nodes, but this takes a while. rand(3,32,9,2010) is
-    // a smaller problem that reveals the same bug.
-    /* @Test */ public void langford9_noX() {
-        final SATProblem l9 = SATProblem.langford(9);
-        assertThat(solveWith(L3NoX).apply(l9), isEmpty());
-        assertThat(solveWith(L3).apply(l9), isEmpty());
-    }
-
     @Test public void rand_3_32_9_2010_noX() {
         assertThat(solveWith(L3NoX).apply(SATProblem.randomInstance(3,32,9,2010)), isPresentAndIs(true));
-    }
-
-
-    @Test public void langford9_L() {
     }
 
     @Test public void w_3_4_13_L() {
