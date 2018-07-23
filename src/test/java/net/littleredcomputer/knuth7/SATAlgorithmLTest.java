@@ -15,14 +15,14 @@ import static org.junit.Assert.assertThat;
 
 public class SATAlgorithmLTest extends SATTestBase {
     private static final Logger log = LogManager.getFormatterLogger();
-    private Function<SATProblem, AbstractSATSolver> L = SATAlgorithmL::new;
-    private Function<SATProblem, AbstractSATSolver> L3 = L.compose(SATProblem::to3SAT);
-    private Function<SATProblem, AbstractSATSolver> L3NoX = p -> {
+    private final Function<SATProblem, AbstractSATSolver> L = SATAlgorithmL::new;
+    private final Function<SATProblem, AbstractSATSolver> L3 = L.compose(SATProblem::to3SAT);
+    private final Function<SATProblem, AbstractSATSolver> L3NoX = p -> {
         SATAlgorithmL a = new SATAlgorithmL(p.to3SAT());
         a.useX = false;
         return a;
     };
-    private Function<SATProblem, AbstractSATSolver> L3NoY = p -> {
+    private final Function<SATProblem, AbstractSATSolver> L3NoY = p -> {
         SATAlgorithmL a = new SATAlgorithmL(p.to3SAT());
         a.useY = false;
         return a;

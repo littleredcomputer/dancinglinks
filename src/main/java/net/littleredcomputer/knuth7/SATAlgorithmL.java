@@ -7,6 +7,7 @@ import gnu.trove.stack.array.TIntArrayStack;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import javax.annotation.Nonnull;
 import java.util.*;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
@@ -28,7 +29,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         float rating;
 
         // This ordering is used during the process of winnowing the lookahead candidate heap
-        @Override public int compareTo(Variable o) { return Float.compare(rating, o.rating); }
+        @Override public int compareTo(@Nonnull Variable o) { return Float.compare(rating, o.rating); }
     }
 
     static class Literal {
@@ -41,7 +42,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         int BSIZE = 0;  // length of active segment of BIMP list
         long IST = 0;
         int TIMP;  // index of first pair of implicants in U,V arrays
-        // final TIntArrayList BIMP = new TIntArrayList();
         final List<Literal> BIMP = new ArrayList<>();
 
         // auxiliary data for Tarjan's algorithm
@@ -57,10 +57,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
         // Knuth economizes on literal memory by reusing the untagged field for height,
         // and the min field for child.
-
-        // XXX should we split them out as a courtesy to those who may read this code
-        // in the future?
-
         Literal child;
         int height;
         float H;  // the "refined" heuristic score
@@ -98,8 +94,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
     private final int[] BRANCH;
     private final Literal[] R;  // stack of literals
     // Reading Knuth we might choose to implement ISTACK as a stack of pairs of ints. But that would require boxing.
-    // Instead, we implement ISTACK as a pair of stacks of primitive ints.
-    private final Stack<Literal> ISTACKb = new Stack<>();  // stack of literals
+    // Instead, we use a pair of stacks.
+    private final Deque<Literal> ISTACKb = new ArrayDeque<>();  // stack of literals
     private final TIntStack ISTACKs = new TIntArrayStack();  // stack of BIMP table sizes for corresponding literals above
     private int T = NT;  // truth degree (F6 7.2.2.2 p. 37)
     private int E = 0;  // literals R[k] are "nearly true" for G <= k < E.
@@ -116,12 +112,10 @@ public class SATAlgorithmL extends AbstractSATSolver {
     boolean trackChoices = false;  // if true, track array will be filled during search for testing; otherwise not
     boolean useX = true;  // whether to use algorithm X for lookahead
     boolean useY = true;  // whether to use algorithm Y for double-lookahead
-    boolean knuthCompatible = true;
+    private final boolean knuthCompatible = true;
 
     enum Trace {STEP, SEARCH, LOOKAHEAD, BIMP, SCORE, FIXING, FOREST}
-
     EnumSet<Trace> tracing = EnumSet.noneOf(Trace.class);
-    // EnumSet<Trace> tracing = EnumSet.of(Trace.FIXING, Trace.LOOKAHEAD);
     private AlgorithmX x = null;
 
     private enum Result {
@@ -523,9 +517,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                     if (tracing.contains(Trace.STEP))
                         log.trace("The search will continue with literal %s. Branch[%d] becomes 0.", l, d);
                     DEC[d] = l;
-// experimenting with moving these to a point at which they are set whether or not l == null.
-//                    BACKF[d] = F;
-//                    BACKI[d] = ISTACKb.size();
                     BRANCH[d] = 0;
                 }
                 case 4:  // Try l.
@@ -1246,9 +1237,9 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
 
         class AlgorithmY {
-            private float β = 0.999f, τ = 0;
+            private final float β = 0.999f;
+            private float τ = 0;
             private final int Y = 10;
-            private Literal l0hat;
             private int jhat, jhatp;  // XXX consider folding Y7 and making these local
             private int DT;
 
@@ -1345,7 +1336,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
             }
 
             private boolean Perform73(Literal l) {
-                l0hat = l;
                 G = E = F;
                 if (!propagate(l)) return false;
                 while (G < E) {
@@ -1360,8 +1350,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 if (tracing.contains(Trace.FIXING)) log.trace("  dlooking %s->%s|%s", L, u, v);
                 Fixity fu = fixity(u), fv = fixity(v);
                 if (fu == Fixity.FIXED_F && fv == Fixity.FIXED_F) return false;
-                else if (fu == Fixity.FIXED_F && fv == Fixity.UNFIXED) { if (!propagate(v)) return false; }
-                else if (fu == Fixity.UNFIXED && fv == Fixity.FIXED_F) { if (!propagate(u)) return false; }
+                else if (fu == Fixity.FIXED_F && fv == Fixity.UNFIXED) return propagate(v);
+                else if (fu == Fixity.UNFIXED && fv == Fixity.FIXED_F) return propagate(u);
                 // the cases that remain: u and v are both unfixed, or at least one is fixed true: do nothing.
                 return true;
             }

@@ -38,8 +38,8 @@ public class ExactCoverProblem {
 
     private static class Option {
         Option(int item, int color) { this.item = item; this.color = color; }
-        int item;
-        int color;
+        final int item;
+        final int color;
     }
 
     private final List<String> items = new ArrayList<>();

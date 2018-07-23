@@ -35,7 +35,6 @@ class ConnectedComponents {
     }
 
     private void process(SATAlgorithmL.Literal v) {
-        SATAlgorithmL.Literal vv = v;
         v.parent = null;
         // Make vertex l active
         makeActive(v);

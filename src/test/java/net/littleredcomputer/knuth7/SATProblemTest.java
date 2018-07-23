@@ -58,7 +58,7 @@ public class SATProblemTest extends SATTestBase {
         assertThat(r.getClause(1060), contains(172, 93, 30));
     }
 
-    private static List<Function<SATProblem, Optional<boolean[]>>> algorithms = ImmutableList.of(
+    private static final List<Function<SATProblem, Optional<boolean[]>>> algorithms = ImmutableList.of(
             p -> new SATAlgorithmA(p).solve(),
             p -> new SATAlgorithmB(p).solve(),
             p -> new SATAlgorithmD(p).solve(),

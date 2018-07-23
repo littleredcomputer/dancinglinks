@@ -318,8 +318,8 @@ public class SATProblem {
             for (int i = 1; i + (j - 1) * d <= n; ++i) {
                 for (int h = 0; h < j; ++h) {
                     clauses.append(i + d * h).append(' ');
-                    addedSome = true;
                 }
+                addedSome = true;
                 clauses.append("0\n");
                 ++clauseCount;
             }
@@ -330,8 +330,8 @@ public class SATProblem {
             for (int i = 1; i + (k - 1) * d <= n; ++i) {
                 for (int h = 0; h < k; ++h) {
                     clauses.append(-i - d * h).append(' ');
-                    addedSome = true;
                 }
+                addedSome = true;
                 clauses.append("0 \n");
                 ++clauseCount;
             }

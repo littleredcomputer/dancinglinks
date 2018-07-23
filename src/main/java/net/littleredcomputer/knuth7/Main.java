@@ -22,7 +22,7 @@ import java.util.stream.Stream;
 
 public class Main {
     private static Joiner spaceJoiner = Joiner.on(' ');
-    private static Splitter commaSplitter = Splitter.on(',');
+    private static final Splitter commaSplitter = Splitter.on(',');
     private static Pattern langfordRe = Pattern.compile("langford\\((\\d+)\\)");
     private static Pattern waerdenRe = Pattern.compile("waerden\\((\\d+),(\\d+),(\\d+)\\)");
     private static Pattern randomRe = Pattern.compile("random\\((\\d+),(\\d+),(\\d+),(\\d+)\\)");

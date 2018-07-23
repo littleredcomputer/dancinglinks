@@ -13,14 +13,14 @@ import java.util.function.Supplier;
 abstract class AbstractSATSolver {
     private static final Logger log = LogManager.getFormatterLogger(AbstractSATSolver.class);
     final int logCheckSteps = 10000;
-    protected final SATProblem problem;
+    final SATProblem problem;
     long stepCount;
     long nodeCount = 0;  // TODO: make sure the other solvers besides L use this
     private long lastStepCount;
     private final String name;
     private Duration logInterval = Duration.ofMillis(1000);
     private Instant lastLogTime = Instant.EPOCH;
-    private Stopwatch stopwatch = Stopwatch.createUnstarted();
+    private final Stopwatch stopwatch = Stopwatch.createUnstarted();
 
     public void setLogInterval(Duration interval) { logInterval = interval; }
 

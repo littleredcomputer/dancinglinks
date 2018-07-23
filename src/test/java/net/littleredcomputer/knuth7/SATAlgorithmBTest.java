@@ -8,7 +8,7 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
 public class SATAlgorithmBTest extends SATTestBase {
-    private Function<SATProblem, AbstractSATSolver> B = SATAlgorithmB::new;
+    private final Function<SATProblem, AbstractSATSolver> B = SATAlgorithmB::new;
 
     @Test public void ex6() { testEx6With(B); }
     @Test public void ex7() { testEx7With(B); }

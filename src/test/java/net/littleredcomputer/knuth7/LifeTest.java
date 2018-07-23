@@ -13,18 +13,18 @@ import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 
 public class LifeTest {
-    private static Life block = Life.fromDots(".... .**. .**. ....");
-    private static Life beehive = Life.fromDots("...... ..**.. .*..*. ..**.. ......");
-    private static Life blinker0 = Life.fromDots("..... ..*.. ..*.. ..*.. .....");
-    private static Life blinker1 = Life.fromDots("..... ..... .***. ..... .....");
-    private static Life loaf = Life.fromDots("...... ..**.. .*..*. ..*.*. ...*.. ......");
-    private static Life boat = Life.fromDots("..... .**.. .*.*. ..*.. .....");
-    private static Life tub = Life.fromDots("..... ..*.. .*.*. ..*.. .....");
-    private static Life toad0 = Life.fromDots("...... ...*.. .*..*. .*..*. ..*... ......");
-    private static Life toad1 = Life.fromDots("...... ...... ..***. .***.. ...... ......");
-    private static Life beacon0 = Life.fromDots("...... .**... .*.... ....*. ...**. ......");
-    private static Life beacon1 = Life.fromDots("...... .**... .**... ...**. ...**. ......");
-    private static Life cross = Life.fromDots(
+    private static final Life block = Life.fromDots(".... .**. .**. ....");
+    private static final Life beehive = Life.fromDots("...... ..**.. .*..*. ..**.. ......");
+    private static final Life blinker0 = Life.fromDots("..... ..*.. ..*.. ..*.. .....");
+    private static final Life blinker1 = Life.fromDots("..... ..... .***. ..... .....");
+    private static final Life loaf = Life.fromDots("...... ..**.. .*..*. ..*.*. ...*.. ......");
+    private static final Life boat = Life.fromDots("..... .**.. .*.*. ..*.. .....");
+    private static final Life tub = Life.fromDots("..... ..*.. .*.*. ..*.. .....");
+    private static final Life toad0 = Life.fromDots("...... ...*.. .*..*. .*..*. ..*... ......");
+    private static final Life toad1 = Life.fromDots("...... ...... ..***. .***.. ...... ......");
+    private static final Life beacon0 = Life.fromDots("...... .**... .*.... ....*. ...**. ......");
+    private static final Life beacon1 = Life.fromDots("...... .**... .**... ...**. ...**. ......");
+    private static final Life cross = Life.fromDots(
             ".......... " +
                     "...****... " +
                     "...*..*... " +

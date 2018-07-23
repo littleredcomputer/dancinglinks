@@ -2,6 +2,7 @@ package net.littleredcomputer.knuth7;
 
 import org.junit.Test;
 
+import javax.annotation.Nonnull;
 import java.util.Arrays;
 import java.util.stream.Stream;
 
@@ -12,9 +13,9 @@ import static org.junit.Assert.assertThat;
 public class HeapTest {
 
     static class BackwardInteger implements Comparable<BackwardInteger> {
-        int i;
+        final int i;
         BackwardInteger(int i) { this.i = i; }
-        @Override public int compareTo(BackwardInteger o) { return o.i - i; }
+        @Override public int compareTo(@Nonnull BackwardInteger o) { return o.i - i; }
     }
 
     @Test
@@ -44,8 +45,8 @@ public class HeapTest {
             h.heapify(A, A.length);
             Stream<Integer> segment = Stream.generate(h::pop).limit(cutoff);
             // m should be <= every remaining element.
-            int m = segment.min(Integer::compare).get();
-            assertThat(m, is(greaterThanOrEqualTo(Stream.generate(h::pop).limit(len-cutoff).max(Integer::compare).get())));
+            int m = segment.min(Integer::compare).orElse(Integer.MIN_VALUE);
+            assertThat(m, is(greaterThanOrEqualTo(Stream.generate(h::pop).limit(len-cutoff).max(Integer::compare).orElse(Integer.MAX_VALUE))));
         }
     }
 }

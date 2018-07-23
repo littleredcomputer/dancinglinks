@@ -12,7 +12,7 @@ import java.util.*;
  * vol 4830. Springer, Berlin, Heidelberg
  */
 
-public class Life {
+class Life {
     private final static Splitter splitter = Splitter.onPattern("\\s").omitEmptyStrings().trimResults();
     private final static CharMatcher dot = CharMatcher.anyOf(".\u00b7");
     final int r;
@@ -98,15 +98,13 @@ public class Life {
     /**
      * This is currently the naive clause set for finding an ancestor of a
      * life tableau.
-     * @return
+     * @return a SAT problem representing the ancestor of this tableau
      */
     public SATProblem ancestor() {
         // Ancestor is sort of like the inverse of step: Given the tableau
         // one step in the future, find a tableau that could have led there.
         // We don't do that ourselves, but instead prepare an instance of
         // SAT which can compute such a tableau, if one exists.
-        int tstep = 1;
-        int nextVar = 0;
 
         // Our goal is to define a collection of variables, one for each cell
         // of the ancestor state, and constrain them so that the ensemble of
