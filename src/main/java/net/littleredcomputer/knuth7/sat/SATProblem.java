@@ -1,6 +1,7 @@
-package net.littleredcomputer.knuth7;
+package net.littleredcomputer.knuth7.sat;
 
 import com.google.common.base.Splitter;
+import net.littleredcomputer.knuth7.SGBRandom;
 
 import java.io.BufferedReader;
 import java.io.PrintStream;
@@ -20,7 +21,7 @@ public class SATProblem {
     private final int nVariables;
     private final List<List<Integer>> clauses = new ArrayList<>();
     private int nLiterals = 0;
-    private int height = 0;
+    private int width = 0;
 
     static class NamedVariableBuilder {
         private int nextVariableIndex = 1;
@@ -61,7 +62,7 @@ public class SATProblem {
 
     // TODO: make private when we switch to the builder pattern.
     // The builder pattern ought also to allow named variables.
-    SATProblem(int nVariables) {
+    public SATProblem(int nVariables) {
         if (nVariables < 1) throw new IllegalArgumentException("Must have at least one variable");
         this.nVariables = nVariables;
     }
@@ -82,8 +83,8 @@ public class SATProblem {
         return nLiterals;
     }
 
-    int height() {
-        return height;
+    int width() {
+        return width;
     }
 
     List<Integer> getClause(int i) {
@@ -105,20 +106,21 @@ public class SATProblem {
         return sign * (literal >> 1);
     }
 
-    void addClause(Iterable<Integer> literals) {
+    // TODO: make this private once we have builder pattern, or get rid of it completely
+    public void addClause(Iterable<Integer> literals) {
         List<Integer> clause = StreamSupport.stream(literals.spliterator(), false)
                 .map(SATProblem::encodeLiteral)
                 .collect(Collectors.collectingAndThen(toList(), Collections::unmodifiableList));
         final int s = clause.size();
         nLiterals += s;
         clauses.add(clause);
-        if (s > height) height = s;
+        if (s > width) width = s;
     }
 
     private void addEncodedClause(List<Integer> encodedLiterals) {
         clauses.add(encodedLiterals);
         nLiterals += encodedLiterals.size();
-        if (encodedLiterals.size() > height) height = encodedLiterals.size();
+        if (encodedLiterals.size() > width) width = encodedLiterals.size();
     }
 
     Optional<boolean[]> solutionFromSteps(int[] steps) {
@@ -203,7 +205,7 @@ public class SATProblem {
      * @return An equivalent problem in 3-SAT.
      */
     public SATProblem to3SAT() {
-        if (this.height <= 3) return this;
+        if (this.width <= 3) return this;
         List<List<Integer>> newClauses = new ArrayList<>();
         int nextVariable = nVariables + 1;
         for (List<Integer> c : clauses) {

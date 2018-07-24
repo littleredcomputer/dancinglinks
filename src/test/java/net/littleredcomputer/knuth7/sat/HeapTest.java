@@ -1,5 +1,7 @@
-package net.littleredcomputer.knuth7;
+package net.littleredcomputer.knuth7.sat;
 
+import net.littleredcomputer.knuth7.SGBRandom;
+import net.littleredcomputer.knuth7.sat.Heap;
 import org.junit.Test;
 
 import javax.annotation.Nonnull;

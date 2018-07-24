@@ -3,6 +3,7 @@ package net.littleredcomputer.knuth7;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Sets;
+import net.littleredcomputer.knuth7.sat.SATProblem;
 
 import java.util.*;
 
@@ -209,6 +210,7 @@ class Life {
         }
         // ok, now we have all the clauses.
         SATProblem p = new SATProblem(r*c);
+        // TODO: switch to builder pattern
         clauses.forEach(p::addClause);
         return p;
     }

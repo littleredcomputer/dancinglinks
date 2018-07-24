@@ -1,4 +1,4 @@
-package net.littleredcomputer.knuth7;
+package net.littleredcomputer.knuth7.sat;
 
 import com.google.common.collect.Lists;
 
@@ -8,7 +8,7 @@ import java.util.Optional;
 
 public class SATAlgorithmA extends AbstractSATSolver {
 
-    SATAlgorithmA(SATProblem p) {
+    public SATAlgorithmA(SATProblem p) {
         super("A", p);
     }
 

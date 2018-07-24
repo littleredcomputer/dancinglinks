@@ -1,4 +1,4 @@
-package net.littleredcomputer.knuth7;
+package net.littleredcomputer.knuth7.sat;
 
 import com.google.common.base.Stopwatch;
 import org.apache.logging.log4j.LogManager;
@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-abstract class AbstractSATSolver {
+public abstract class AbstractSATSolver {
     private static final Logger log = LogManager.getFormatterLogger(AbstractSATSolver.class);
     final int logCheckSteps = 10000;
     final SATProblem problem;

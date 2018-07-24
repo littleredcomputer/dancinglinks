@@ -1,4 +1,4 @@
-package net.littleredcomputer.knuth7;
+package net.littleredcomputer.knuth7.sat;
 
 import org.junit.Test;
 

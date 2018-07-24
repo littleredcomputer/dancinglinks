@@ -1,4 +1,4 @@
-package net.littleredcomputer.knuth7;
+package net.littleredcomputer.knuth7.sat;
 
 import java.util.Arrays;
 import java.util.List;
@@ -6,7 +6,7 @@ import java.util.Optional;
 import java.util.function.IntUnaryOperator;
 
 public class SATAlgorithmD extends AbstractSATSolver {
-    SATAlgorithmD(SATProblem problem) {
+    public SATAlgorithmD(SATProblem problem) {
         super("D", problem);
     }
 

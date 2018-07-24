@@ -1,4 +1,4 @@
-package net.littleredcomputer.knuth7;
+package net.littleredcomputer.knuth7.sat;
 
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
@@ -51,7 +51,7 @@ public class SATProblemTest extends SATTestBase {
         // Knuth's example rand-3-1061-250-314159.sat (except our variables are 1-based,
         // and his are 0-based)
         SATProblem r = SATProblem.randomInstance(3, 1061, 250, 314159);
-        assertThat(r.height(), is(3));
+        assertThat(r.width(), is(3));
         assertThat(r.nClauses(), is(1061));
         assertThat(r.nVariables(), is(250));
         assertThat(r.getClause(0), contains(-165, 123, 90));
@@ -70,12 +70,12 @@ public class SATProblemTest extends SATTestBase {
         String cnf = String.format("p cnf %d 1\n%s\n", n, vars);
         SATProblem p = SATProblem.parseFrom(cnf);
         assertThat(p.nVariables(), is(n));
-        assertThat(p.height(), is(n));
+        assertThat(p.width(), is(n));
         assertThat(p.nClauses(), is(1));
         assertThat(new SATAlgorithmA(p).solve(), isPresent());
         SATProblem q = p.to3SAT();
         assertThat(q.nVariables(), is(2*n-3));
-        assertThat(q.height(), is(3));
+        assertThat(q.width(), is(3));
         assertThat(q.nClauses(), is(n-2));
         Optional<boolean[]> qsol = new SATAlgorithmA(q).solve();
         assertThat(qsol.map(q::evaluate), isPresent());

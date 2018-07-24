@@ -1,4 +1,4 @@
-package net.littleredcomputer.knuth7;
+package net.littleredcomputer.knuth7.sat;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

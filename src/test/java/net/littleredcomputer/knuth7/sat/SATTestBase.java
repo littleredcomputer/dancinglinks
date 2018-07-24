@@ -1,4 +1,4 @@
-package net.littleredcomputer.knuth7;
+package net.littleredcomputer.knuth7.sat;
 
 import com.github.npathai.hamcrestopt.OptionalMatchers;
 import com.google.common.primitives.Booleans;

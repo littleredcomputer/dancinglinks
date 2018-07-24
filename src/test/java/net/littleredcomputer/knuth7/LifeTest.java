@@ -1,5 +1,6 @@
 package net.littleredcomputer.knuth7;
 
+import net.littleredcomputer.knuth7.sat.*;
 import org.junit.Test;
 
 import java.util.Optional;
