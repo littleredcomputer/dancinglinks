@@ -15,15 +15,15 @@ import static org.junit.Assert.assertThat;
 
 public class SATAlgorithmLTest extends SATTestBase {
     private static final Logger log = LogManager.getFormatterLogger();
-    private final Function<SATProblem, AbstractSATSolver> L = SATAlgorithmL::new;
+    private final Function<SATProblem, AbstractSATSolver> L = SATAlgorithmL3::new; /* XXX change to: SATAlgorithmL::New */
     private final Function<SATProblem, AbstractSATSolver> L3 = L.compose(SATProblem::to3SAT);
     private final Function<SATProblem, AbstractSATSolver> L3NoX = p -> {
-        SATAlgorithmL a = new SATAlgorithmL(p.to3SAT());
+        SATAlgorithmL a = new SATAlgorithmL3(p.to3SAT());
         a.useX = false;
         return a;
     };
     private final Function<SATProblem, AbstractSATSolver> L3NoY = p -> {
-        SATAlgorithmL a = new SATAlgorithmL(p.to3SAT());
+        SATAlgorithmL a = new SATAlgorithmL3(p.to3SAT());
         a.useY = false;
         return a;
     };
@@ -66,7 +66,7 @@ public class SATAlgorithmLTest extends SATTestBase {
 
     @Test public void w_3_4_17() {
         SATProblem p = SATProblem.waerden(3,4,17);
-        SATAlgorithmL a = new SATAlgorithmL(p.to3SAT());
+        SATAlgorithmL a = new SATAlgorithmL3(p.to3SAT());
         a.trackChoices = true;
         assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
         // This is sort of delicate but getting all the computations working in the same way
@@ -78,7 +78,7 @@ public class SATAlgorithmLTest extends SATTestBase {
 
     @Test public void w_3_4_17_noY() {
         SATProblem p = SATProblem.waerden(3,4,17);
-        SATAlgorithmL a = new SATAlgorithmL(p.to3SAT());
+        SATAlgorithmL a = new SATAlgorithmL3(p.to3SAT());
         a.useY = false;
         a.trackChoices = true;
         assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
@@ -86,14 +86,14 @@ public class SATAlgorithmLTest extends SATTestBase {
     }
 
     @Test public void rand3_420_100_0_L() {
-        SATAlgorithmL a = new SATAlgorithmL(rand3_420_100_0);
+        SATAlgorithmL a = new SATAlgorithmL3(rand3_420_100_0);
         a.trackChoices = true;
         assertThat(a.solve().map(rand3_420_100_0::evaluate), isEmpty());
         assertThat(a.track(), is("[3, 42, ~84, 52, ~52, 84, ~11, 11, ~42, 40, ~40, ~3, 63, 34, 2, ~2, ~34, ~63]"));
     }
 
     @Test public void rand3_420_100_0_LnoY() {
-        SATAlgorithmL a = new SATAlgorithmL(rand3_420_100_0);
+        SATAlgorithmL a = new SATAlgorithmL3(rand3_420_100_0);
         a.trackChoices = true;
         a.useY = false;
         assertThat(a.solve().map(rand3_420_100_0::evaluate), isEmpty());
@@ -106,7 +106,7 @@ public class SATAlgorithmLTest extends SATTestBase {
     }
     @Test public void w_4_4_34() {
         SATProblem p = SATProblem.waerden(4, 4, 34).to3SAT();
-        SATAlgorithmL a = new SATAlgorithmL(p);
+        SATAlgorithmL a = new SATAlgorithmL3(p);
         a.useY = true;
         assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
     }
@@ -117,7 +117,7 @@ public class SATAlgorithmLTest extends SATTestBase {
 
     @Test public void w_3_4_13_L() {
         SATProblem p = SATProblem.waerden(3,4,13);
-        SATAlgorithmL a = new SATAlgorithmL(p.to3SAT());
+        SATAlgorithmL a = new SATAlgorithmL3(p.to3SAT());
         assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
     }
     @Test public void w338() { assertThat(solveWith(L).apply(SATProblem.waerden(3, 3, 8)), isPresentAndIs(true)); }
@@ -140,7 +140,7 @@ public class SATAlgorithmLTest extends SATTestBase {
     /* a minimal example I used to chase a bug. */
     @Test public void rand_3_13_7_617() {
         SATProblem p = SATProblem.randomInstance(3, 13, 7, 617);
-        SATAlgorithmL a = new SATAlgorithmL(p);
+        SATAlgorithmL a = new SATAlgorithmL3(p);
         assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
     }
 
@@ -158,7 +158,7 @@ public class SATAlgorithmLTest extends SATTestBase {
     @Test
     public void aX2() {
         SATProblem p = SATProblem.parseKnuth("a ~b\na ~c\nc ~d\n");
-        SATAlgorithmL a = new SATAlgorithmL(p);
+        SATAlgorithmL a = new SATAlgorithmL3(p);
         //a.stopAtStep = 1;
         a.solve();
     }

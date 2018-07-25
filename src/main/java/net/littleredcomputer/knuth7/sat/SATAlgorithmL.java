@@ -10,14 +10,21 @@ import org.apache.logging.log4j.Logger;
 
 import javax.annotation.Nonnull;
 import java.util.*;
-import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
-public class SATAlgorithmL extends AbstractSATSolver {
+public abstract class SATAlgorithmL extends AbstractSATSolver {
     private static final Logger log = LogManager.getFormatterLogger();
     private static final int RT = 0x7ffffffe;
     private static final int NT = RT - 2;
     private static final int PT = NT - 2;
+
+    abstract void addClause(List<Integer> clause);
+    abstract void printTable();
+    abstract boolean deactivate(Literal L);
+    abstract void reactivate(Variable X);
+    abstract float[] computeHeuristics();
+    protected abstract boolean Perform72(Literal l);
+    protected abstract boolean Perform73(Literal l);
 
     static class Variable implements Comparable<Variable> {
         Variable(int id) { this.id = id; }
@@ -82,47 +89,42 @@ public class SATAlgorithmL extends AbstractSATSolver {
         int LO = 0;
     }
 
-    // These next 4 arrays all grow in sync.
-    private final boolean wide;  // True if there is a clause in the problem with > 3 literals
-
-    // The data structures U, V, LINK and NEXT are used in the 3-SAT optimized form of Algorithm L.
-    private final List<Literal> U;
-    private final List<Literal> V;
-    private final TIntArrayList LINK;
-    private final TIntArrayList NEXT;
-    // The data structures CINX, CSIZE are used in the WIDE form (k-SAT where k > 3) of Algorithm L.
-    private final List<List<Literal>> CINX;
-    private final TIntArrayList CSIZE;
-
+    final int nVariables;
     private final List<Literal> FORCE = new ArrayList<>();
-    private final Literal[] lit;
+    final Literal[] lit;
+    // TODO: add a comment explaining the difference between these and probably change the name of one of them.
     private final Variable[] var;
-    private final Variable[] VAR;
+    final Variable[] VAR;
     private final Literal[] DEC;
     private final int[] BACKF;  // backtrack value of F, indexed by depth
     private final int[] BACKI;  // backtrack value of ISTACK size, indexed by depth
     private final int[] BRANCH;
-    private final Literal[] R;  // stack of literals
+    final Literal[] R;  // stack of literals
     // Reading Knuth we might choose to implement ISTACK as a stack of pairs of ints. But that would require boxing.
     // Instead, we use a pair of stacks.
     private final Deque<Literal> ISTACKb = new ArrayDeque<>();  // stack of literals
     private final TIntStack ISTACKs = new TIntArrayStack();  // stack of BIMP table sizes for corresponding literals above
     private int T = NT;  // truth degree (F6 7.2.2.2 p. 37)
-    private int E = 0;  // literals R[k] are "nearly true" for G <= k < E.
-    private int F = 0;
-    private int G = 0;
+    int E = 0;  // literals R[k] are "nearly true" for G <= k < E.
+    int F = 0;
+    int G = 0;
     private long ISTAMP = 0;  // Knuth points out (sat11.w:1528) that this could conceivably overflow a 32-bit int
     private long BSTAMP = 0;  // stamp value of current candidate list in algorithm X
-    private int d = 0;  // current depth within search tree
+    int d = 0;  // current depth within search tree
     // private int state = 2;  // currently executing step of algorithm L
     // private Literal l = null;  // Current branch literal
     private int SIG = 0;  // Current prefix of binary encoding of branch state
     private int SIGL = 0;
     private final List<Literal> track = new ArrayList<>();  // used to record linear branch sequence, for test purposes
     boolean trackChoices = false;  // if true, track array will be filled during search for testing; otherwise not
+    final float[][] h;  // h[d][l] is the h-score ("rough heuristic") of literal l at depth d
+    double w = 0.0;  // Current weight of lookahead choice. TODO it is dodgy that this is an instance variable...
+
+
     boolean useX = true;  // whether to use algorithm X for lookahead
     boolean useY = true;  // whether to use algorithm Y for double-lookahead
     private final boolean knuthCompatible = true;
+    final Deque<Literal> W = new ArrayDeque<>();  // windfalls
 
     enum Trace {STEP, SEARCH, LOOKAHEAD, BIMP, SCORE, FIXING, FOREST}
     EnumSet<Trace> tracing = EnumSet.noneOf(Trace.class);
@@ -134,20 +136,26 @@ public class SATAlgorithmL extends AbstractSATSolver {
         SAT         // We have found a satisying (possibly partial) assignment
     }
 
-    private enum Fixity {
+    enum Fixity {
         UNFIXED,
         FIXED_T,
         FIXED_F
     }
 
-    public SATAlgorithmL(SATProblem p) {
-        super("L", p);
-        final int nVariables = problem.nVariables();
-        final int literalAllocation = 2 * nVariables + 2;
-        wide = p.width() > 3;
+    public static SATAlgorithmL New(SATProblem p) {
+        if (p.width() <= 3) return new SATAlgorithmL3(p);
+        return new SATAlgorithmLX(p);
+    }
+
+    SATAlgorithmL(String name, SATProblem p) {
+        super(name, p);
+        nVariables = problem.nVariables();
+        h = new float[nVariables + 1][];
         var = new Variable[nVariables + 1];
+        final boolean wide = p.width() > 3;
+
         Arrays.setAll(var, Variable::new);
-        lit = new Literal[literalAllocation];
+        lit = new Literal[2 * nVariables + 2];
         Arrays.setAll(lit, Literal::new);
         for (Literal l : lit) {
             l.not = lit[not(l.id)];
@@ -162,64 +170,9 @@ public class SATAlgorithmL extends AbstractSATSolver {
         R = new Literal[nVariables + 1];  // stack to record the names of literals that have received values.
         // A literal and its complement never appear together here, so nVariables is enough space (but: one-based)
 
-        Set<Integer> units = new HashSet<>();
-        List<Set<Integer>> oBIMP = new ArrayList<>(literalAllocation);
-        for (int i = 0; i < 2 * nVariables + 2; ++i) oBIMP.add(new HashSet<>());
         // We process the clauses in reverse order because Knuth does. This means our BIMP and TIMP tableaux
         // will be initialized with the same data in the same order as sat11.w.
 
-        if (wide) {
-            CINX = new ArrayList<>();
-            CSIZE = new TIntArrayList();
-
-            U = V = null;
-            LINK = NEXT = null;
-        } else {
-            U = new ArrayList<>();
-            V = new ArrayList<>();
-            LINK = new TIntArrayList();
-            NEXT = new TIntArrayList();
-
-            CINX = null;
-            CSIZE = null;
-        }
-
-        Lists.reverse(problem.encodedClauses()).forEach(clause -> {
-            switch (clause.size()) {
-                case 1: {
-                    // Put it in the FORCE array, unless it is contradictory
-                    final int u = clause.get(0);
-                    if (units.contains(not(u)))
-                        throw new IllegalArgumentException("Contradictory unit clauses involving variable " + thevar(u) + " found");
-                    units.add(u);
-                    break;
-                }
-                case 2: {
-                    // Put it in the BIMP. Choosing v, u in this order produces a Knuth-compatible BIMP table.
-                    final int v = clause.get(0), u = clause.get(1);
-                    oBIMP.get(not(u)).add(v);
-                    oBIMP.get(not(v)).add(u);
-                    break;
-                }
-                case 3: {
-                    if (wide) {
-                        addWideClause(clause);
-                    } else {
-                        add3Clause(clause);
-                    }
-                    break;
-                }
-                default:
-                    addWideClause(clause);
-            }
-        });
-        for (int li = 2; li < literalAllocation; ++li) {
-            final Literal l = lit[li];
-            oBIMP.get(li).forEach(i -> l.BIMP.add(lit[i]));
-            l.BSIZE = l.BIMP.size();
-        }
-        units.forEach(i -> FORCE.add(lit[i]));
-        if (!FORCE.isEmpty() && tracing.contains(Trace.SEARCH)) log.trace("initially forcing %s", FORCE);
         // Knuth scrambles the order of the free variables here. I don't love this, since the
         // RNG he uses is also used for other randomization purposes: this makes the exact behavior
         // of the algorithm overly determined by details of the implementation, IMO.
@@ -246,63 +199,39 @@ public class SATAlgorithmL extends AbstractSATSolver {
         }
     }
 
-    /**
-     * Adds a 3-clause to the TIMP database.
-     * @param clause in encoded literal index form
-     */
-    private void add3Clause(List<Integer> clause) {
-        final Literal w = lit[clause.get(0)], v = lit[clause.get(1)], u = lit[clause.get(2)];
-
-        int z = U.size();
-        U.add(v);
-        V.add(w);
-
-        U.add(w);
-        V.add(u);
-
-        U.add(u);
-        V.add(v);
-
-        LINK.add(z + 1);
-        LINK.add(z + 2);
-        LINK.add(z);
-
-        NEXT.add(u.not.TIMP);
-        NEXT.add(v.not.TIMP);
-        NEXT.add(w.not.TIMP);
-
-        u.not.TIMP = z;
-        v.not.TIMP = z + 1;
-        w.not.TIMP = z + 2;
-
-        ++u.not.TSIZE;
-        ++v.not.TSIZE;
-        ++w.not.TSIZE;
-    }
-
-    /**
-     * Adds a wide clause to the solver's data structures.
-     * A new entry in CINX is made, and every involved literal's KINX table receives the index of the new CINX entry.
-     * CSIZE and KSIZE are maintained.
-     * @param clause in encoded literal index form
-     */
-    private void addWideClause(List<Integer> clause) {
-        final int k = CINX.size();
-        List<Literal> c = clause.stream().map(l -> lit[l]).collect(Collectors.toList());
-        CINX.add(c);
-        CSIZE.add(c.size());
-        c.forEach(l -> {
-            l.KINX.add(k);
-            ++l.KSIZE;
+    void addClauses(SATProblem p) {
+        Set<Integer> units = new HashSet<>();
+        List<Set<Integer>> oBIMP = new ArrayList<>(2*nVariables+2);
+        for (int i = 0; i < 2 * nVariables + 2; ++i) oBIMP.add(new HashSet<>());
+        Lists.reverse(problem.encodedClauses()).forEach(clause -> {
+            switch (clause.size()) {
+                case 1: {
+                    // Put it in the FORCE array, unless it is contradictory
+                    final int u = clause.get(0);
+                    if (units.contains(not(u)))
+                        throw new IllegalArgumentException("Contradictory unit clauses involving variable " + thevar(u) + " found");
+                    units.add(u);
+                    break;
+                }
+                case 2: {
+                    // Put it in the BIMP. Choosing v, u in this order produces a Knuth-compatible BIMP table.
+                    final int v = clause.get(0), u = clause.get(1);
+                    oBIMP.get(not(u)).add(v);
+                    oBIMP.get(not(v)).add(u);
+                    break;
+                }
+                default:
+                    addClause(clause);
+            }
         });
-    }
-
-    private boolean timpForEach(Literal l, BiFunction<Literal, Literal, Boolean> f) {
-        for (int p = l.TIMP, i = 0; i < l.TSIZE; p = NEXT.get(p), ++i) {
-            Literal u = U.get(p), v = V.get(p);
-            if (!f.apply(u, v)) return false;
+        for (int li = 2; li < 2 * nVariables + 2; ++li) {
+            final Literal l = lit[li];
+            oBIMP.get(li).forEach(i -> l.BIMP.add(lit[i]));
+            l.BSIZE = l.BIMP.size();
         }
-        return true;
+        units.forEach(i -> FORCE.add(lit[i]));
+        if (!FORCE.isEmpty() && tracing.contains(Trace.SEARCH)) log.trace("initially forcing %s", FORCE);
+
     }
 
     /**
@@ -310,7 +239,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
      * If a conflict is at any point, the propagation is abandoned early and false is
      * returned.
      */
-    private boolean propagate(Literal l) {
+    boolean propagate(Literal l) {
         int H = E;
         if (!takeAccountOf(l, false)) {
             return false;
@@ -340,7 +269,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     }
 
     /* Append l to BIMP[b], allowing for an undo in the future. */
-    private void appendToBimp(Literal b, Literal l) {
+    void appendToBimp(Literal b, Literal l) {
         final int bsize = b.BSIZE;
         if (b.IST != ISTAMP) {
             b.IST = ISTAMP;
@@ -354,7 +283,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
         ++b.BSIZE;
     }
 
-    private void makeParticipants(Variable v, Variable w) {
+    void makeParticipants(Variable v, Variable w) {
         maintainPrefix(v);
         maintainPrefix(w);
     }
@@ -378,7 +307,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
     /**
      * Implements steps L8 and L9 of Algorithm L. Returns false if the next step is CONFLICT.
      */
-    private boolean consider(Literal u, Literal v) {
+    boolean consider(Literal u, Literal v) {
         // if (log.isTraceEnabled()) log.trace("consider %d∨%d", dl(u), dl(v));
         // STEP L8: Consider u ∨ v
         Fixity fu = fixity(u);
@@ -440,18 +369,10 @@ public class SATAlgorithmL extends AbstractSATSolver {
     }
 
     /* Returns the fixity of l in the context T */
-    private Fixity fixity(Literal l) {
+    Fixity fixity(Literal l) {
         int val = l.var.VAL;
         if (val < T) return Fixity.UNFIXED;
         return negated(val) == negated(l.id) ? Fixity.FIXED_T : Fixity.FIXED_F;
-    }
-
-
-    private String timpToString(Literal l) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(String.format("  %3s -> ", l));
-        timpForEach(l, (u, v) -> { sb.append(u).append('|').append(v).append(' '); return true; });
-        return sb.toString();
     }
 
     private void print() {
@@ -468,23 +389,8 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         withExcess && (l.BSIZE < l.BIMP.size()) ? String.format("(+%d)", l.BIMP.size() - l.BSIZE) : "");
             }
         }
-        if (wide) {
-            log.trace("TIMP tables:");
-            for (int i = 1; i < lit.length; ++i) {
-                final Literal l = lit[i];
-                if (l.TSIZE > 0) {
-                    log.trace(timpToString(l));
-                }
-            }
-        } else {
-            log.trace("WIDE tables");
-            for (int i = 0; i < CINX.size(); ++i) {
-                final int n = CSIZE.getQuick(i);
-                if (n > 0) {
-                    log.trace("CINX(%d) = %s", i, CINX.get(i).stream().limit(n).map(Literal::toString).collect(Collectors.joining(", ")));
-                }
-            }
-        }
+
+        printTable();
     }
 
     private String stateToString() {
@@ -501,7 +407,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         Literal l = null;
         int state = 2;
 
-        TIntArrayList buf = new TIntArrayList();
 
         STEP:
         while (true) {
@@ -655,25 +560,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
                         --E;
                         Variable X = R[E].var;
                         // reactivate the TIMP pairs that involve X and restore X to the free list (ex. 137)
-                        for (int xi = 2 * X.id + 1; xi >= 2 * X.id; --xi) {
-                            final Literal xlit = lit[xi];
-                            if (tracing.contains(Trace.BIMP)) log.trace("Reactivating %s @ %d", xlit, E);
-                            // Knuth insists (in the printed fascicle) that the downdating of TIMP should
-                            // happen in the reverse order of the updating, which would seem to argue for
-                            // traversing this linked list in reverse order. However, since each entry in
-                            // the TIMP list will point (via U and V) to two strictly other TIMP lists, it's
-                            // not clear why the order matters.
-
-                            buf.resetQuick();
-
-                            for (int p = xlit.TIMP, tcount = 0; tcount < xlit.TSIZE; p = NEXT.get(p), ++tcount)
-                                buf.add(p);
-                            for (int p = buf.size() - 1; p >= 0; --p) {
-                                final int k = buf.getQuick(p);
-                                ++U.get(k).not.TSIZE;
-                                ++V.get(k).not.TSIZE;
-                            }
-                        }
+                        reactivate(X);
                         X.VAL = 0;
                     }
                 case 13:  // Downdate BIMPs
@@ -714,118 +601,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
         }
     }
 
-    // TODO: consider whether we should make this part of two subclasses of Algorithm L, one for k-SAT k==3, one for k>3.
-
-    private boolean deactivate(Literal L) {
-        if (wide) return deactivateWide(L); else return removeFromTIMP(L);
-    }
-
-    /**
-     * This is the heart of step L7 in the 3-SAT case. The suppressed variable is moved
-     * to the end of the TIMP lists and the corresponding sizes are dropped to conceal the
-     * variable in a way that is easy to reverse upon backtracking (by just restoring the
-     * original sizes).
-     * @param L Literal whose variable to hide.
-     */
-    private boolean removeFromTIMP(Literal L) {
-        // kind of silly?
-        for (int xi = poslit(L.var).id; xi <= neglit(L.var).id; ++xi) {
-            final Literal l = lit[xi];
-            for (int p = l.TIMP, tcount = 0; tcount < l.TSIZE; p = NEXT.get(p), ++tcount) {
-                Literal u0 = U.get(p), v = V.get(p);
-                int pp = LINK.get(p);
-                int ppp = LINK.get(pp);
-                int s = --u0.not.TSIZE;
-                int t = u0.not.TIMP;
-                for (int i = 0; i < s; ++i) t = NEXT.get(t);
-                if (pp != t) {
-                    final Literal uu = U.get(t), vv = V.get(t);
-                    int q = LINK.get(t);
-                    int qq = LINK.get(q);
-                    LINK.set(qq, pp);
-                    LINK.set(p, t);
-                    U.set(pp, uu);
-                    V.set(pp, vv);
-                    LINK.set(pp, q);
-                    U.set(t, v);
-                    V.set(t, l.not);
-                    LINK.set(t, ppp);
-
-                    // NOT IN KNUTH: reset pp.
-                    pp = t;
-                    // END NOT IN KNUTH
-                }
-                // Then set...
-                s = --v.not.TSIZE;
-                t = v.not.TIMP;
-                for (int i = 0; i < s; ++i) t = NEXT.get(t);
-                if (ppp != t) {  // swap pairs by setting
-                    final Literal uu = U.get(t), vv = V.get(t);
-                    int q = LINK.get(t);
-                    int qq = LINK.get(q);
-                    LINK.set(qq, ppp);
-                    LINK.set(pp, t);
-                    U.set(ppp, uu);
-                    V.set(ppp, vv);
-                    LINK.set(ppp, q);
-                    U.set(t, l.not);
-                    V.set(t, u0);
-                    LINK.set(t, p);
-                }
-            }
-        }
-
-        // XXX what follows is TIMP based, and will have to be fixed...
-
-        // Do step L8 for all pairs (u,v) in TIMP(L) then return to L6.
-        for (int p = L.TIMP, tcount = 0; tcount < L.TSIZE; p = NEXT.get(p), ++tcount) {
-            final Literal u = U.get(p), v = V.get(p);
-            if (tracing.contains(Trace.FIXING)) log.trace("  %s->%s|%s", L, u, v);
-            makeParticipants(u.var, v.var);
-            if (!consider(u, v)) return false;
-        }
-        return true;
-    }
-
-    private boolean deactivateWide(Literal L) {
-        for (int xi = poslit(L.var).id; xi <= neglit(L.var).id; ++xi) {
-            final Literal l = lit[xi];
-            for (int i = 0; i < l.KSIZE; ++i) {
-                final int c = l.KINX.getQuick(i);
-                for (int j = 0; j < CSIZE.getQuick(c); ++j) {
-                    final List<Literal> clause = CINX.get(j);
-                    for (int k = 0; k < CSIZE.getQuick(j); ++k) {
-                        final Literal u = clause.get(k);
-                        int s = --u.KSIZE;
-                        final int t = u.KINX.indexOf(c);  // find the t <= s for which KINX(u)[t] == c
-                        if (t < 0) throw new IllegalStateException("internal error: damaged wide index");
-                        if (t != s) {
-                            u.KINX.set(t, u.KINX.getQuick(s));
-                            u.KINX.set(s, c);
-                        }
-                        // TODO: implement the heuristic in the ans. to ex 143
-                    }
-                }
-            }
-        }
-        for (int i = 0; i < L.not.KSIZE; ++i) {
-            final int c = L.not.KINX.getQuick(i);
-            int s = CSIZE.getQuick(c) - 1;
-            CSIZE.set(c, s);
-            if (s == 2) {
-                // Find the two free literals (u, v) in CINX(c), swap them into the first
-                // positions of that list, put them on a temporary stack, and swap c out of the
-                // clause lists of u and v as above.
-
-                // i.e.: there were 3 literals, and now there are two. Swapping the
-                // 3rd guy into the third position if necessary should leave the two
-                // free literals at the head of the list.
-            }
-        }
-        // Finally step L7' does step L8' = L8 for all (u, v) on the temporary stack.
-        return true; /* XXX */
-    }
-
     private Optional<boolean[]> solution() {
         boolean sat[] = new boolean[var.length-1];
         for (int i = 1; i < var.length; ++i) sat[i - 1] = (var[i].VAL & 1) == 0;
@@ -844,81 +619,16 @@ public class SATAlgorithmL extends AbstractSATSolver {
         private final Lookahead[] look;  // lookahead entries
         int S;  // number of valid look[] entries
         int BASE;  // current base truth level (shared between algorithms X and Y
-        private final Deque<Literal> W = new ArrayDeque<>();  // windfalls
 
-        private final float alpha = 3.5f;
-        private final float THETA = 20.0f;
         private final int C0 = 30, C1 = 600;  // See Ex. 148
-        private final int nVariables;
-        private double w = 0.0;  // Current weight of lookahead choice. TODO it is dodgy that this is an instance variable...
-        private final float[][] h;  // h[d][l] is the h-score ("rough heuristic") of literal l at depth d
-        private final float[] hprime;  // storage for refinement steps of heuristic score
         private final Heap<Variable> candidateHeap = new Heap<>();
         private final ConnectedComponents connectedComponents = new ConnectedComponents();
 
         AlgorithmX() {
-            nVariables = problem.nVariables();
             CAND = new Variable[nVariables + 1];
             nCAND = 0;
-            h = new float[nVariables + 1][];
-            hprime = new float[2*nVariables+2];
             look = new Lookahead[2*nVariables];
             Arrays.setAll(look, i -> new Lookahead());
-        }
-
-        private void heuristicStep(float[] from, float[] to) {
-            float sum, tsum, factor, sqfactor, afactor;
-            final int N = nVariables - F;
-
-            sum = 0;
-            for (int i = 0; i < N; ++i) {
-                final Variable v = VAR[i];
-                sum += from[poslit(v).id] + from[neglit(v).id];
-            }
-            factor = 2f * N / sum;
-            sqfactor = factor * factor;
-            afactor = alpha * factor;
-            for (int i = 0; i < N; ++i) {
-                final Variable v = VAR[i];
-                for (int li = poslit(v).id; li <= neglit(v).id; ++li) {
-                    final Literal l = lit[li];
-                    sum = 0;
-                    // for all u in BIMP[l] with u not fixed
-                    List<Literal> bimpl = l.BIMP;
-                    for (int j = 0; j < l.BSIZE; ++j) {
-                        final Literal u = bimpl.get(j);
-                        if (isfree(u)) {
-                            sum += from[u.id];
-                        }
-                    }
-                    tsum = 0;
-                    for (int p = l.TIMP, j = 0; j < l.TSIZE; p = NEXT.get(p), ++j) {
-                        tsum += from[U.get(p).id] * from[V.get(p).id];
-                    }
-                    sum = 0.1f + sum * afactor + tsum * sqfactor;
-                    to[li] = Float.min(THETA, sum);
-                }
-            }
-        }
-
-        /** Step X2: Compile rough heuristics. */
-        private float[] computeHeuristics() {
-            if (h[d] == null) {
-                h[d] = new float[2 * nVariables + 2];
-            }
-            float[] hd = h[d];
-
-            if (d <= 1) {
-                Arrays.fill(hprime, 1);
-                heuristicStep(hprime, hd);
-                heuristicStep(hd, hprime);
-                heuristicStep(hprime, hd);
-                heuristicStep(hd, hprime);
-                heuristicStep(hprime, hd);
-            } else {
-                heuristicStep(h[d-1], hd);
-            }
-            return hd;
         }
 
         /*
@@ -1286,43 +996,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
             }
         }
 
-        private boolean Perform72(final Literal l) {
-            w = 0;
-            G = E = F;
-            W.clear();
-            if (!propagate(l)) return false;  // Perform (62).
-            while (G < E) {
-                Literal L = R[G];
-                ++G;
-                // take account of (u, v) for all (u, v) in TIMP(L)
-                for (int t = 0, p = L.TIMP; t < L.TSIZE; ++t, p = NEXT.getQuick(p)) {
-                    Literal u = U.get(p), v = V.get(p);
-                    if (tracing.contains(Trace.FIXING)) log.trace("  looking %s->%s|%s", L, u, v);
-                    Fixity fu = fixity(u), fv = fixity(v);
-                    if (fu == Fixity.FIXED_T || fv == Fixity.FIXED_T) continue;
-                    if (fu == Fixity.FIXED_F && fv == Fixity.FIXED_F) return false;
-                    if (fu == Fixity.FIXED_F && fv == Fixity.UNFIXED) {
-                        if (!propagate(v)) return false;
-                        W.push(v);
-                    } else if (fu == Fixity.UNFIXED && fv == Fixity.FIXED_F) {
-                        if (!propagate(u)) return false;
-                        W.push(u);
-                    } else {
-                        assert fu == Fixity.UNFIXED && fv == Fixity.UNFIXED;
-                        w += h[d][u.id] * h[d][v.id];
-                    }
-                }
-            }
-            // generate new binary clauses (lbar_0 | w) for w in W. Knuth performs these steps in LIFO order; so do we.
-            while (!W.isEmpty()) {
-                Literal w = W.pop();
-                if (tracing.contains(Trace.LOOKAHEAD)) log.trace("windfall %s->%s", l, w);
-                appendToBimp(l, w);
-                appendToBimp(w.not, l.not);
-            }
-
-            return true;
-        }
 
         private boolean X12(Literal l) {
             FORCE.add(l);
@@ -1355,7 +1028,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
             }
             return true;
         }
-
 
         class AlgorithmY {
             private final float β = 0.999f;
@@ -1455,27 +1127,6 @@ public class SATAlgorithmL extends AbstractSATSolver {
                 W.push(l);
                 return true;
             }
-
-            private boolean Perform73(Literal l) {
-                G = E = F;
-                if (!propagate(l)) return false;
-                while (G < E) {
-                    Literal L = R[G];
-                    ++G;
-                    if (!timpForEach(L, (u, v) -> dlTakeAccountOf(L, u, v))) return false;
-                }
-                return true;
-            }
-
-            private boolean dlTakeAccountOf(Literal L, Literal u, Literal v) {
-                if (tracing.contains(Trace.FIXING)) log.trace("  dlooking %s->%s|%s", L, u, v);
-                Fixity fu = fixity(u), fv = fixity(v);
-                if (fu == Fixity.FIXED_F && fv == Fixity.FIXED_F) return false;
-                else if (fu == Fixity.FIXED_F && fv == Fixity.UNFIXED) return propagate(v);
-                else if (fu == Fixity.UNFIXED && fv == Fixity.FIXED_F) return propagate(u);
-                // the cases that remain: u and v are both unfixed, or at least one is fixed true: do nothing.
-                return true;
-            }
         }
     }
 
@@ -1488,7 +1139,7 @@ public class SATAlgorithmL extends AbstractSATSolver {
 
     private Literal poslit(Variable v) { return lit[poslit(v.id)]; }
     private Literal neglit(Variable v) { return lit[neglit(v.id)]; }
-    private boolean isfree(Literal l) { return l.var.VAL < RT; }
+    boolean isfree(Literal l) { return l.var.VAL < RT; }
     private boolean isfixed(Literal l) { return l.var.VAL >= T; }
     String track() { return track.toString(); }
 }

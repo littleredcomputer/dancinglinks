@@ -62,7 +62,7 @@ public class SATProblemTest extends SATTestBase {
             p -> new SATAlgorithmA(p).solve(),
             p -> new SATAlgorithmB(p).solve(),
             p -> new SATAlgorithmD(p).solve(),
-            p -> new SATAlgorithmL(p.to3SAT()).solve()
+            p -> new SATAlgorithmL3(p.to3SAT()).solve()
     );
 
     private void threeSat(int n) {
