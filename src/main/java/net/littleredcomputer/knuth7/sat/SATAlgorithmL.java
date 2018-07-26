@@ -199,7 +199,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
         }
     }
 
-    void addClauses(SATProblem p) {
+    void addClauses() {
         Set<Integer> units = new HashSet<>();
         List<Set<Integer>> oBIMP = new ArrayList<>(2*nVariables+2);
         for (int i = 0; i < 2 * nVariables + 2; ++i) oBIMP.add(new HashSet<>());

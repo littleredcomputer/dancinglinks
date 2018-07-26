@@ -17,6 +17,7 @@ public class SATAlgorithmLX extends SATAlgorithmL {
     SATAlgorithmLX(SATProblem p) {
         /* XXX put the name in here */
         super("LX", p);
+        addClauses();
     }
 
     /**
@@ -48,16 +49,21 @@ public class SATAlgorithmLX extends SATAlgorithmL {
 
     @Override boolean deactivate(Literal L) {
         for (int xi = poslit(L.var.id); xi <= neglit(L.var.id); ++xi) {
-            final Literal l = lit[xi];
+            final Literal l = lit[xi];  // for l in {L, ~L}
             for (int i = 0; i < l.KSIZE; ++i) {
-                final int c = l.KINX.getQuick(i);
-                for (int j = 0; j < CSIZE.getQuick(c); ++j) {
+                final int c = l.KINX.getQuick(i);  // for each clause c containing l
+                List<Literal> clause = CINX.get(c);
+                // find l in clause, move it to the end, and shorten the clause
+                int s = --u.KSIZE;
+                int j = clause.indexOf(l);
+                if (j < 0) throw new IllegalStateException("internal error: damaged wide index");
+                if (j >= CSIZE.get(j)) throw new IllegalStateException("internal error: literal was found in inactive part of the clause data")
+
                     final List<Literal> clause = CINX.get(j);
                     for (int k = 0; k < CSIZE.getQuick(j); ++k) {
                         final Literal u = clause.get(k);
-                        int s = --u.KSIZE;
                         final int t = u.KINX.indexOf(c);  // find the t <= s for which KINX(u)[t] == c
-                        if (t < 0) throw new IllegalStateException("internal error: damaged wide index");
+                        if (t < 0) throw new
                         if (t != s) {
                             u.KINX.set(t, u.KINX.getQuick(s));
                             u.KINX.set(s, c);

@@ -25,7 +25,7 @@ public class SATAlgorithmL3 extends SATAlgorithmL {
     public SATAlgorithmL3(SATProblem p) {
         super("L3", p); /* XXX once L becomes abstract also pass the name */
         hprime = new float[2 * p.nVariables() + 2];
-        addClauses(p);
+        addClauses();
     }
 
     /**
@@ -35,11 +35,8 @@ public class SATAlgorithmL3 extends SATAlgorithmL {
      */
     @Override
     void addClause(List<Integer> clause) {
-        // where we left off: constructing our part of the instance from super() is too early,
-        // since the subclass initializations have not happened yet.
-
+        if (clause.size() != 3) throw new IllegalArgumentException("The L3 solver only applies to 3-SAT problems");
         final Literal w = lit[clause.get(0)], v = lit[clause.get(1)], u = lit[clause.get(2)];
-
         int z = U.size();
         U.add(v);
         V.add(w);
