@@ -21,7 +21,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
     abstract void addClause(List<Integer> clause);
     abstract void printTable();
     abstract boolean deactivate(Literal L);
-    abstract void reactivate(Variable X);
+    abstract void reactivate(Literal L);
     abstract float[] computeHeuristics();
     protected abstract boolean Perform72(Literal l);
     protected abstract boolean Perform73(Literal l);
@@ -152,7 +152,6 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
         nVariables = problem.nVariables();
         h = new float[nVariables + 1][];
         var = new Variable[nVariables + 1];
-        final boolean wide = p.width() > 3;
 
         Arrays.setAll(var, Variable::new);
         lit = new Literal[2 * nVariables + 2];
@@ -160,7 +159,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
         for (Literal l : lit) {
             l.not = lit[not(l.id)];
             l.var = var[thevar(l.id)];
-            if (wide) l.KINX = new TIntArrayList();
+            l.KINX = new TIntArrayList();
         }
         VAR = new Variable[nVariables];
         DEC = new Literal[nVariables];
@@ -558,10 +557,9 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
                 case 12:  // Unfix real truths.
                     while (E > F) {
                         --E;
-                        Variable X = R[E].var;
                         // reactivate the TIMP pairs that involve X and restore X to the free list (ex. 137)
-                        reactivate(X);
-                        X.VAL = 0;
+                        reactivate(R[E]);
+                        R[E].var.VAL = 0;
                     }
                 case 13:  // Downdate BIMPs
                     if (BRANCH[d] >= 0) {

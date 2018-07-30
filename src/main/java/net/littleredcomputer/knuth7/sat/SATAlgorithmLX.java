@@ -1,10 +1,13 @@
 package net.littleredcomputer.knuth7.sat;
 
 import gnu.trove.list.array.TIntArrayList;
+import javafx.util.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -48,64 +51,105 @@ public class SATAlgorithmLX extends SATAlgorithmL {
     }
 
     @Override boolean deactivate(Literal L) {
-        for (int xi = poslit(L.var.id); xi <= neglit(L.var.id); ++xi) {
-            final Literal l = lit[xi];  // for l in {L, ~L}
-            for (int i = 0; i < l.KSIZE; ++i) {
-                final int c = l.KINX.getQuick(i);  // for each clause c containing l
-                List<Literal> clause = CINX.get(c);
-                // find l in clause, move it to the end, and shorten the clause
-                int s = --u.KSIZE;
-                int j = clause.indexOf(l);
-                if (j < 0) throw new IllegalStateException("internal error: damaged wide index");
-                if (j >= CSIZE.get(j)) throw new IllegalStateException("internal error: literal was found in inactive part of the clause data")
+        // Remove the formerly free variable |L| from the data structures.
+        // First deactivate all of the active big clauses that contain L:
 
-                    final List<Literal> clause = CINX.get(j);
-                    for (int k = 0; k < CSIZE.getQuick(j); ++k) {
-                        final Literal u = clause.get(k);
-                        final int t = u.KINX.indexOf(c);  // find the t <= s for which KINX(u)[t] == c
-                        if (t < 0) throw new
-                        if (t != s) {
-                            u.KINX.set(t, u.KINX.getQuick(s));
-                            u.KINX.set(s, c);
-                        }
-                        // TODO: implement the heuristic in the ans. to ex 143
-                    }
-                }
+
+        for (int i = 0; i < L.KSIZE; ++i) {
+            final int c = L.KINX.getQuick(i), N = CSIZE.getQuick(c);
+            final List<Literal> us = CINX.get(c);
+            for (int j = 0; j < N; ++j) {
+                final Literal u = us.get(j);
+                swapOutOfClauseList(c, u);
             }
         }
-        for (int i = 0; i < L.not.KSIZE; ++i) {
-            final int c = L.not.KINX.getQuick(i);
+        final Literal notL = L.not;
+        Deque<Pair<Literal, Literal>> stack = new ArrayDeque<>();  // TODO: eliminate allocation
+        // Update the clauses for which L has become false
+        for (int i = 0; i < notL.KSIZE; ++i) {
+            final int c = notL.KINX.getQuick(i);
             int s = CSIZE.getQuick(c) - 1;
             CSIZE.set(c, s);
+            // find notL in the clause; swap it into the end position
+            final List<Literal> clause = CINX.get(c);
+            int t = clause.indexOf(notL);
+            if (t != s) {
+                assert t < s;
+                clause.set(t, clause.get(s));
+                clause.set(s, notL);
+            }
             if (s == 2) {
                 // Find the two free literals (u, v) in CINX(c), swap them into the first
                 // positions of that list, put them on a temporary stack, and swap c out of the
                 // clause lists of u and v as above.
-
-                // i.e.: there were 3 literals, and now there are two. Swapping the
-                // 3rd guy into the third position if necessary should leave the two
-                // free literals at the head of the list.
+                final Literal u = clause.get(0), v = clause.get(1);
+                stack.push(new Pair<>(u, v));  // TODO: eliminate allocation
+                swapOutOfClauseList(c, u);
+                swapOutOfClauseList(c, v);
             }
         }
         // Finally step L7' does step L8' = L8 for all (u, v) on the temporary stack.
-        return true; /* XXX */
+        // Do step L8 for all pairs (u,v) in TIMP(L) then return to L6.
+        while (!stack.isEmpty()) {
+            Pair<Literal, Literal> top = stack.pop();
+            final Literal u = top.getKey(), v = top.getValue();
+            if (tracing.contains(Trace.FIXING)) log.trace("  %s->%s|%s", L, u, v);
+            makeParticipants(u.var, v.var);
+            if (!consider(u, v)) return false;
+        }
+        return true;
     }
 
-    @Override void reactivate(Variable X) {
-        throw new IllegalStateException("don't know how to do this yet");
+    private void swapOutOfClauseList(int clauseIndex, Literal u) {
+        // Swap c out of u's clause list
+        final int s = --u.KSIZE;
+        // Find the t <= s with KINX(u)[t] == c
+        final TIntArrayList kinxU = u.KINX;
+        final int t = kinxU.indexOf(clauseIndex);
+        if (t != s) {
+            assert t < s;
+            kinxU.set(t, kinxU.getQuick(s));
+            kinxU.set(s, clauseIndex);
+        }
+        // TODO: implement heuristic
+    }
+
+    @Override void reactivate(Literal L) {
+        final Literal notL = L.not;
+        for (int i = notL.KSIZE - 1; i >= 0; --i) {
+            final int c = notL.KINX.getQuick(i);
+            // proceeding in reverse order from the order used in L7'...
+            final int s = CSIZE.getQuick(c);
+            CSIZE.set(c, s+1);
+            if (s == 2) {
+                // swap c back into the clause lists of u and v, where u = CINX(c)[0] and v = CINX(c)[1].
+                ++CINX.get(c).get(0).KSIZE;
+                ++CINX.get(c).get(1).KSIZE;
+            }
+        }
+        for (int i = L.KSIZE - 1; i >= 0; --i) {
+            final int c = L.KINX.getQuick(i);
+            final List<Literal> clause = CINX.get(c);
+            for (int j = CSIZE.get(c) - 1; j >= 0; --j) {
+                // for each of the CSIZE(c) free literals u in CINX(c), again proceeding in referse order from
+                // the order used in L7', swap c back into the clause list of u (which, by design, is just an
+                // increment of the size)
+                ++clause.get(j).KSIZE;
+            }
+        }
     }
 
     @Override float[] computeHeuristics() {
-        return new float[0];
+        throw new IllegalStateException("not ready");
     }
 
     @Override
     protected boolean Perform72(Literal l) {
-        return false;
+        throw new IllegalStateException("not ready");
     }
 
     @Override
     protected boolean Perform73(Literal l) {
-        return false;
+        throw new IllegalStateException("not ready");
     }
 }

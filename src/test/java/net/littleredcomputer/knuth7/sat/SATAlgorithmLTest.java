@@ -4,6 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.junit.Test;
 
+import java.util.EnumSet;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -25,6 +26,11 @@ public class SATAlgorithmLTest extends SATTestBase {
     private final Function<SATProblem, AbstractSATSolver> L3NoY = p -> {
         SATAlgorithmL a = new SATAlgorithmL3(p.to3SAT());
         a.useY = false;
+        return a;
+    };
+    private final Function<SATProblem, AbstractSATSolver> LXnoX = p -> {
+        SATAlgorithmL a = new SATAlgorithmLX(p);
+        a.useX = false;
         return a;
     };
 
@@ -59,6 +65,15 @@ public class SATAlgorithmLTest extends SATTestBase {
     @Test public void rand3_1061_L() { testRand3_1061With(L); }
     @Test public void rand3_1062_L() { testRand3_1062With(L); }
     @Test public void langford() { testLangfordWith(L3); }
+
+
+    @Test public void w3_3_XnoX() {
+        // SATAlgorithmL s = new SATAlgorithmLX(SATProblem.waerden(3, 3, 9));
+        SATAlgorithmL s = new SATAlgorithmL3(SATProblem.waerden(3, 3, 9));
+        s.useX = false;
+        s.tracing = EnumSet.allOf(SATAlgorithmL.Trace.class);
+        assertThat(s.solve(), isEmpty());
+    }
 
 
     // This one still takes a long time

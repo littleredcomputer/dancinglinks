@@ -149,9 +149,6 @@ public class SATAlgorithmL3 extends SATAlgorithmL {
                 }
             }
         }
-
-        // XXX what follows is TIMP based, and will have to be fixed...
-
         // Do step L8 for all pairs (u,v) in TIMP(L) then return to L6.
         for (int p = L.TIMP, tcount = 0; tcount < L.TSIZE; p = NEXT.get(p), ++tcount) {
             final Literal u = U.get(p), v = V.get(p);
@@ -163,8 +160,8 @@ public class SATAlgorithmL3 extends SATAlgorithmL {
     }
 
     @Override
-    void reactivate(Variable X) {
-        for (int xi = 2 * X.id + 1; xi >= 2 * X.id; --xi) {
+    void reactivate(Literal L) {
+        for (int xi = neglit(L.var.id); xi >= poslit(L.var.id); --xi) {
             final Literal xlit = lit[xi];
             // Knuth insists (in the printed fascicle) that the downdating of TIMP should
             // happen in the reverse order of the updating, which would seem to argue for
