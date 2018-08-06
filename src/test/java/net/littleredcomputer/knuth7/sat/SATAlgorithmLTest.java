@@ -16,10 +16,15 @@ import static org.junit.Assert.assertThat;
 
 public class SATAlgorithmLTest extends SATTestBase {
     private static final Logger log = LogManager.getFormatterLogger();
-    private final Function<SATProblem, AbstractSATSolver> L = SATAlgorithmL3::new; /* XXX change to: SATAlgorithmL::New */
-    private final Function<SATProblem, AbstractSATSolver> L3 = L.compose(SATProblem::to3SAT);
+    private final Function<SATProblem, AbstractSATSolver> L = SATAlgorithmL::New; /* XXX change to: SATAlgorithmL::New */
+    private final Function<SATProblem, AbstractSATSolver> L3 = p -> new SATAlgorithmL3(p.to3SAT());
     private final Function<SATProblem, AbstractSATSolver> L3NoX = p -> {
         SATAlgorithmL a = new SATAlgorithmL3(p.to3SAT());
+        a.useX = false;
+        return a;
+    };
+    private final Function<SATProblem, AbstractSATSolver> LNoX = p -> {
+        SATAlgorithmL a = SATAlgorithmL.New(p);
         a.useX = false;
         return a;
     };
@@ -35,21 +40,32 @@ public class SATAlgorithmLTest extends SATTestBase {
     };
 
     @Test public void w3_3() { assertThat(waerden(3, 3, L), is(9)); }
-
     @Test public void w3_3_noX() { assertThat(waerden(3, 3, L3NoX), is(9)); }
     @Test public void w3_4() { assertThat(waerden(3, 4, L3), is(18)); }
     @Test public void w3_4_noX() { assertThat(waerden(3, 4, L3NoX), is(18)); }
     @Test public void w3_4_noY() { assertThat(waerden(3, 4, L3NoY), is(18)); }
-    @Test public void w4_3() { assertThat(waerden(4, 3, L3), is(18)); }
-    @Test public void w4_4() { assertThat(waerden(4, 4, L3), is(35)); }
-    @Test public void w3_6() { assertThat(waerden(3, 6, L3), is(32)); }
-    @Test public void w3_7() { assertThat(waerden(3, 7, L3), is(46)); }
-    @Test public void w3_8() { assertThat(waerden(3, 8, L3), is(58)); }
-    @Test public void w4_5() { assertThat(waerden(4, 5, L3), is(55)); }
-    @Test public void w5_4() { assertThat(waerden(5, 4, L3), is(55)); }
-    @Test public void w6_3() { assertThat(waerden(6, 3, L3), is(32)); }
-    @Test public void w7_3() { assertThat(waerden(7, 3, L3), is(46)); }
-    @Test public void w8_3() { assertThat(waerden(8, 3, L3), is(58)); }
+    @Test public void w4_3_L3() { assertThat(waerden(4, 3, L3), is(18)); }
+    @Test public void w4_4_L3() { assertThat(waerden(4, 4, L3), is(35)); }
+    @Test public void w3_6_L3() { assertThat(waerden(3, 6, L3), is(32)); }
+    @Test public void w3_7_L3() { assertThat(waerden(3, 7, L3), is(46)); }
+    @Test public void w3_8_L3() { assertThat(waerden(3, 8, L3), is(58)); }
+    @Test public void w4_5_L3() { assertThat(waerden(4, 5, L3), is(55)); }
+    @Test public void w5_4_L3() { assertThat(waerden(5, 4, L3), is(55)); }
+    @Test public void w6_3_L3() { assertThat(waerden(6, 3, L3), is(32)); }
+    @Test public void w7_3_L3() { assertThat(waerden(7, 3, L3), is(46)); }
+    @Test public void w8_3_L3() { assertThat(waerden(8, 3, L3), is(58)); }
+    /* switch to L */
+    @Test public void w4_3() { assertThat(waerden(4, 3, LNoX), is(18)); }  // XXX change all y'all to L
+    @Test public void w4_4() { assertThat(waerden(4, 4, LNoX), is(35)); }
+    @Test public void w3_6() { assertThat(waerden(3, 6, LNoX), is(32)); }
+    @Test public void w3_7() { assertThat(waerden(3, 7, LNoX), is(46)); }
+    @Test public void w3_8() { assertThat(waerden(3, 8, LNoX), is(58)); }
+    @Test public void w4_5() { assertThat(waerden(4, 5, LNoX), is(55)); }
+    @Test public void w5_4() { assertThat(waerden(5, 4, LNoX), is(55)); }
+    @Test public void w6_3() { assertThat(waerden(6, 3, LNoX), is(32)); }
+    @Test public void w7_3() { assertThat(waerden(7, 3, LNoX), is(46)); }
+    @Test public void w8_3() { assertThat(waerden(8, 3, LNoX), is(58)); }
+
     // These are do-able with L3, but take around 30s
     /* @Test */ public void w6_4() { assertThat(waerden(6, 4, L3), is(73)); }
     /* @Test */ public void w4_6() { assertThat(waerden(4, 6, L3), is(73)); }
@@ -69,7 +85,7 @@ public class SATAlgorithmLTest extends SATTestBase {
 
     @Test public void w3_3_XnoX() {
         // SATAlgorithmL s = new SATAlgorithmLX(SATProblem.waerden(3, 3, 9));
-        SATAlgorithmL s = new SATAlgorithmL3(SATProblem.waerden(3, 3, 9));
+        SATAlgorithmL s = new SATAlgorithmLX(SATProblem.waerden(3, 3, 9));
         s.useX = false;
         s.tracing = EnumSet.allOf(SATAlgorithmL.Trace.class);
         assertThat(s.solve(), isEmpty());

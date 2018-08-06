@@ -48,19 +48,24 @@ public class SATAlgorithmLX extends SATAlgorithmL {
                 log.trace("CINX(%d) = %s", i, CINX.get(i).stream().limit(n).map(Literal::toString).collect(Collectors.joining(", ")));
             }
         }
+        for (int i = 2; i < 2*nVariables+2; ++i) {
+            final Literal l = lit[i];
+            if (l.KSIZE > 0) {
+                log.trace("KINX(%s) = %s", l, l.KINX.subList(0, l.KSIZE));
+            }
+        }
     }
 
     @Override boolean deactivate(Literal L) {
+        if (tracing.contains(Trace.BIMP)) log.trace( "<-- DEACTIVATE %s", L);
         // Remove the formerly free variable |L| from the data structures.
         // First deactivate all of the active big clauses that contain L:
-
-
         for (int i = 0; i < L.KSIZE; ++i) {
-            final int c = L.KINX.getQuick(i), N = CSIZE.getQuick(c);
+            final int c = L.KINX.getQuick(i);
             final List<Literal> us = CINX.get(c);
-            for (int j = 0; j < N; ++j) {
+            for (int j = 0; j < us.size(); ++j) {
                 final Literal u = us.get(j);
-                swapOutOfClauseList(c, u);
+                if (isfree(u)) swapOutOfClauseList(c, u);
             }
         }
         final Literal notL = L.not;
@@ -69,6 +74,7 @@ public class SATAlgorithmLX extends SATAlgorithmL {
         for (int i = 0; i < notL.KSIZE; ++i) {
             final int c = notL.KINX.getQuick(i);
             int s = CSIZE.getQuick(c) - 1;
+            if (tracing.contains(Trace.BIMP)) log.trace("Removing %s from clause #%d %s", notL, c, s == 2 ? "*" : "");
             CSIZE.set(c, s);
             // find notL in the clause; swap it into the end position
             final List<Literal> clause = CINX.get(c);
@@ -82,6 +88,8 @@ public class SATAlgorithmLX extends SATAlgorithmL {
                 // Find the two free literals (u, v) in CINX(c), swap them into the first
                 // positions of that list, put them on a temporary stack, and swap c out of the
                 // clause lists of u and v as above.
+                // NB: Knuth suggests that swapping may need to happen, but does it? Hasn't the previous step taken care of that?
+                assert clause.get(2) == notL;
                 final Literal u = clause.get(0), v = clause.get(1);
                 stack.push(new Pair<>(u, v));  // TODO: eliminate allocation
                 swapOutOfClauseList(c, u);
@@ -101,6 +109,7 @@ public class SATAlgorithmLX extends SATAlgorithmL {
     }
 
     private void swapOutOfClauseList(int clauseIndex, Literal u) {
+        if (tracing.contains(Trace.BIMP)) log.trace("Removing #%d from %s's clause list", clauseIndex, u);
         // Swap c out of u's clause list
         final int s = --u.KSIZE;
         // Find the t <= s with KINX(u)[t] == c
@@ -115,26 +124,38 @@ public class SATAlgorithmLX extends SATAlgorithmL {
     }
 
     @Override void reactivate(Literal L) {
+        if (tracing.contains(Trace.BIMP)) log.trace("--> REACTIVATE %s", L);
         final Literal notL = L.not;
         for (int i = notL.KSIZE - 1; i >= 0; --i) {
             final int c = notL.KINX.getQuick(i);
             // proceeding in reverse order from the order used in L7'...
             final int s = CSIZE.getQuick(c);
+            final List<Literal> cinxC = CINX.get(c);
             CSIZE.set(c, s+1);
+            if (tracing.contains(Trace.BIMP)) log.trace("Adding %s to clause #%d", cinxC.get(s), c);
             if (s == 2) {
                 // swap c back into the clause lists of u and v, where u = CINX(c)[0] and v = CINX(c)[1].
-                ++CINX.get(c).get(0).KSIZE;
-                ++CINX.get(c).get(1).KSIZE;
+                final Literal u = cinxC.get(0), v = cinxC.get(1);
+                ++v.KSIZE;
+                ++u.KSIZE;
+                if (tracing.contains(Trace.BIMP)) {
+                    log.trace("Adding #%d to %s's clause list", v.KINX.getQuick(v.KSIZE-1), v);
+                    log.trace("Adding #%d to %s's clause list", u.KINX.getQuick(u.KSIZE-1), u);
+                }
             }
         }
         for (int i = L.KSIZE - 1; i >= 0; --i) {
             final int c = L.KINX.getQuick(i);
             final List<Literal> clause = CINX.get(c);
-            for (int j = CSIZE.get(c) - 1; j >= 0; --j) {
-                // for each of the CSIZE(c) free literals u in CINX(c), again proceeding in referse order from
-                // the order used in L7', swap c back into the clause list of u (which, by design, is just an
-                // increment of the size)
-                ++clause.get(j).KSIZE;
+            for (int j = clause.size() - 1; j >= 0; --j) {
+                final Literal u = clause.get(j);
+                if (isfree(u)) {
+                    // for each of the CSIZE(c) free literals u in CINX(c), again proceeding in reverse order from
+                    // the order used in L7', swap c back into the clause list of u (which, by design, is just an
+                    // increment of the size)
+                    ++clause.get(j).KSIZE;
+                    if (tracing.contains(Trace.BIMP)) log.trace("Adding #%d to %s's clause list", clause.get(j).KINX.getQuick(clause.get(j).KSIZE-1), clause.get(j));
+                }
             }
         }
     }
