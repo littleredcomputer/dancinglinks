@@ -6,6 +6,7 @@ import org.junit.Test;
 
 import java.util.EnumSet;
 import java.util.Optional;
+import java.util.Random;
 import java.util.function.Function;
 
 import static com.github.npathai.hamcrestopt.OptionalMatchers.isEmpty;
@@ -175,7 +176,7 @@ public class SATAlgorithmLTest extends SATTestBase {
         assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
     }
 
-    @Test public void manySmallRandomInstances() {
+    @Test public void manySmallRandom3Instances() {
         final int k = 3, m = 640, n = 150, N = 250;
         int unsat = 0, sat = 0;
         for (int i = 0; i < N; ++i) {
@@ -185,6 +186,20 @@ public class SATAlgorithmLTest extends SATTestBase {
         }
         log.info("After %d tests %d sat %d unsat", N, sat, unsat);
     }
+
+    @Test public void manySmallRandomKInstances() {
+        Random r = new Random(314159);
+        final int m = 640, n = 150, N = 250;
+        int unsat = 0, sat = 0;
+        for (int i = 0; i < N; ++i) {
+            final int k = r.nextInt(5) + 3;
+            Optional<Boolean> a = solveWith(LNoX).apply(SATProblem.randomInstance(k, m, n, i));  // XXX change this to L
+            assertThat(a, is(either(isPresentAndIs(true)).or(isEmpty())));
+            if (a.isPresent()) ++sat; else ++unsat;
+        }
+        log.info("After %d tests %d sat %d unsat", N, sat, unsat);
+    }
+
 
     @Test
     public void aX2() {

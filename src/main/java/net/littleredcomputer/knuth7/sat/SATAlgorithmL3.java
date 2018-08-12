@@ -18,12 +18,15 @@ public class SATAlgorithmL3 extends SATAlgorithmL {
     private final TIntArrayList LINK = new TIntArrayList();
     private final TIntArrayList NEXT = new TIntArrayList();
     private final TIntArrayList buf = new TIntArrayList();
+    private final float[][] h;  // h[d][l] is the h-score ("rough heuristic") of literal l at depth d
     private final float[] hprime;  // storage for refinement steps of heuristic score
     private final float alpha = 3.5f;
     private final float THETA = 20.0f;
 
+
     public SATAlgorithmL3(SATProblem p) {
         super("L3", p); /* XXX once L becomes abstract also pass the name */
+        h = new float[nVariables + 1][];
         hprime = new float[2 * p.nVariables() + 2];
         addClauses();
     }
@@ -153,7 +156,8 @@ public class SATAlgorithmL3 extends SATAlgorithmL {
         for (int p = L.TIMP, tcount = 0; tcount < L.TSIZE; p = NEXT.get(p), ++tcount) {
             final Literal u = U.get(p), v = V.get(p);
             if (tracing.contains(Trace.FIXING)) log.trace("  %s->%s|%s", L, u, v);
-            makeParticipants(u.var, v.var);
+            makeParticipant(u.var);
+            makeParticipant(v.var);
             if (!consider(u, v)) return false;
         }
         return true;

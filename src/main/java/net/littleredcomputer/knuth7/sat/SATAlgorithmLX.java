@@ -13,14 +13,18 @@ import java.util.stream.Collectors;
 
 public class SATAlgorithmLX extends SATAlgorithmL {
     private static final Logger log = LogManager.getFormatterLogger();
+    private static final float epsilon = 0.001f;
     // The data structures CINX, CSIZE are used in the WIDE form (k-SAT where k > 3) of Algorithm L.
     private final List<List<SATAlgorithmL.Literal>> CINX = new ArrayList<>();
     private final TIntArrayList CSIZE = new TIntArrayList();
+    private final float[] h;
+
 
     SATAlgorithmLX(SATProblem p) {
         /* XXX put the name in here */
         super("LX", p);
         addClauses();
+        h = new float[2 * nVariables + 2];
     }
 
     /**
@@ -63,10 +67,16 @@ public class SATAlgorithmLX extends SATAlgorithmL {
         for (int i = 0; i < L.KSIZE; ++i) {
             final int c = L.KINX.getQuick(i);
             final List<Literal> us = CINX.get(c);
-            for (int j = 0; j < us.size(); ++j) {
+            // At most CSIZE(c) literals in us can be free, so we can break early when we have seen that many.
+            // In general, though, they need not appear at the front of the list
+            for (int j = 0, n = 0; j < us.size() && n < CSIZE.getQuick(c); ++j) {
                 final Literal u = us.get(j);
-                if (isfree(u)) swapOutOfClauseList(c, u);
+                if (isfree(u)) {
+                    swapOutOfClauseList(c, u);
+                    ++n;
+                }
             }
+            // TODO: implement the free-sorting heuristic here
         }
         final Literal notL = L.not;
         Deque<Pair<Literal, Literal>> stack = new ArrayDeque<>();  // TODO: eliminate allocation
@@ -98,11 +108,15 @@ public class SATAlgorithmLX extends SATAlgorithmL {
         }
         // Finally step L7' does step L8' = L8 for all (u, v) on the temporary stack.
         // Do step L8 for all pairs (u,v) in TIMP(L) then return to L6.
+
+        // XXX see sat11k.ch line 604: we choose the new participants differently.
+        // XXX see sat11k.ch line 742 for the algorithm to establish a new participant.
+
         while (!stack.isEmpty()) {
             Pair<Literal, Literal> top = stack.pop();
             final Literal u = top.getKey(), v = top.getValue();
             if (tracing.contains(Trace.FIXING)) log.trace("  %s->%s|%s", L, u, v);
-            makeParticipants(u.var, v.var);
+            // makeParticipants(u.var, v.var);
             if (!consider(u, v)) return false;
         }
         return true;
@@ -147,7 +161,7 @@ public class SATAlgorithmLX extends SATAlgorithmL {
         for (int i = L.KSIZE - 1; i >= 0; --i) {
             final int c = L.KINX.getQuick(i);
             final List<Literal> clause = CINX.get(c);
-            for (int j = clause.size() - 1; j >= 0; --j) {
+            for (int j = clause.size() - 1, n = 0; n < CSIZE.getQuick(c) && j >= 0; --j) {
                 final Literal u = clause.get(j);
                 if (isfree(u)) {
                     // for each of the CSIZE(c) free literals u in CINX(c), again proceeding in reverse order from
@@ -161,11 +175,24 @@ public class SATAlgorithmLX extends SATAlgorithmL {
     }
 
     @Override float[] computeHeuristics() {
-        throw new IllegalStateException("not ready");
+        // DEK write: "Good results have been obtained with the simple formula
+        //   h(l) = ε + KSIZE(lbar) + sum(u in BIMP(l), u free; KSIZE(ubar))
+        // which estimates the potential number of big-clause reductions that occur when l becomes true.
+        // ε is typically set to 0.001.
+        for (int i = 2; i < 2 * nVariables + 2; ++i) {
+            final Literal l = lit[i];
+            h[i] = epsilon + l.not.KSIZE;
+            for (int j = 0; j < l.BSIZE; ++j) {
+                final Literal u = l.BIMP.get(i);
+                if (isfree(u)) h[i] += u.not.KSIZE;
+            }
+        }
+        return h;
     }
 
     @Override
     protected boolean Perform72(Literal l) {
+
         throw new IllegalStateException("not ready");
     }
 

@@ -23,8 +23,8 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
     abstract boolean deactivate(Literal L);
     abstract void reactivate(Literal L);
     abstract float[] computeHeuristics();
-    protected abstract boolean Perform72(Literal l);
-    protected abstract boolean Perform73(Literal l);
+    abstract boolean Perform72(Literal l);
+    abstract boolean Perform73(Literal l);
 
     static class Variable implements Comparable<Variable> {
         Variable(int id) { this.id = id; }
@@ -117,7 +117,6 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
     private int SIGL = 0;
     private final List<Literal> track = new ArrayList<>();  // used to record linear branch sequence, for test purposes
     boolean trackChoices = false;  // if true, track array will be filled during search for testing; otherwise not
-    final float[][] h;  // h[d][l] is the h-score ("rough heuristic") of literal l at depth d
     double w = 0.0;  // Current weight of lookahead choice. TODO it is dodgy that this is an instance variable...
 
 
@@ -150,7 +149,6 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
     SATAlgorithmL(String name, SATProblem p) {
         super(name, p);
         nVariables = problem.nVariables();
-        h = new float[nVariables + 1][];
         var = new Variable[nVariables + 1];
 
         Arrays.setAll(var, Variable::new);
@@ -282,12 +280,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
         ++b.BSIZE;
     }
 
-    void makeParticipants(Variable v, Variable w) {
-        maintainPrefix(v);
-        maintainPrefix(w);
-    }
-
-    private void maintainPrefix(Variable v) {
+    void makeParticipant(Variable v) {
         int q = v.SIGL;
         if (q < SIGL) {
             int t = SIG;
@@ -761,9 +754,10 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
             // order?
             if (knuthCompatible) for (int i = 0; i < CANDL.size(); ++i) Collections.reverse(CANDL.get(i).arcs);
 
-            for (int i = 0; i < CANDL.size(); ++i) {
-                Literal l = CANDL.get(i);
-                if (tracing.contains(Trace.FOREST)) if (!l.arcs.isEmpty()) log.trace("Arcs: %s -> %s", l, l.arcs);
+            if (tracing.contains(Trace.FOREST)) {
+                for (Literal l : CANDL) {
+                    if (!l.arcs.isEmpty()) log.trace("Arcs: %s -> %s", l, l.arcs);
+                }
             }
 
             // X4 [Nest the candidates.]
@@ -892,7 +886,6 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
             int xstate = 6;
             // Move to avoid allocation. When to reset this?
 
-            STEP:
             while (true) switch (xstate) {
                 case 6: { // [Choose l for lookahead.]
                     l = look[j].LL;
@@ -1012,12 +1005,14 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
             //   literals form an autarky. If TSIZE(l) is nonzero for any free literal
             //   l, some clause is unsatisfied. Otherwise all clauses are satisfied
             //   unless some free l has an unfixed literal lʹ ∈ BIMP(l)."
+
             for (int vi = 0; vi < nVariables - F; ++vi) {
                 final Variable v = VAR[vi];
                 for (int li = poslit(v).id; li <= neglit(v).id; ++li) {
                     final Literal l = lit[li];
                     // l is a free literal since v is a free variable.
                     if (l.TSIZE > 0) return false;
+                    if (l.not.KSIZE > 0) return false;  // XXX: this should be delegated to the subclass (somehow).
                     List<Literal> bimpl = l.BIMP;
                     for (int j = 0; j < l.BSIZE; ++j) {
                         if (!isfixed(bimpl.get(j))) return false;
