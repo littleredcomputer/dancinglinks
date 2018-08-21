@@ -187,9 +187,9 @@ public class SATAlgorithmLTest extends SATTestBase {
         log.info("After %d tests %d sat %d unsat", N, sat, unsat);
     }
 
-    @Test public void manySmallRandomKInstances() {
+    @Test public void aFewRandomKInstances() {
         Random r = new Random(314159);
-        final int m = 640, n = 150, N = 250;
+        final int m = 640, n = 150, N = 25;
         int unsat = 0, sat = 0;
         for (int i = 0; i < N; ++i) {
             final int k = r.nextInt(5) + 3;

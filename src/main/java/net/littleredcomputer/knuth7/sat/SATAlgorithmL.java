@@ -8,6 +8,7 @@ import net.littleredcomputer.knuth7.SGBRandom;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import javax.annotation.CheckReturnValue;
 import javax.annotation.Nonnull;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -25,6 +26,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
     abstract float[] computeHeuristics();
     abstract boolean Perform72(Literal l);
     abstract boolean Perform73(Literal l);
+    abstract void ResetFptr();  // TODO this is dodgy
 
     static class Variable implements Comparable<Variable> {
         Variable(int id) { this.id = id; }
@@ -92,6 +94,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
     final int nVariables;
     private final List<Literal> FORCE = new ArrayList<>();
     final Literal[] lit;
+    final boolean wide;  // true if there is a clause with more than 3 literals
     // TODO: add a comment explaining the difference between these and probably change the name of one of them.
     private final Variable[] var;
     final Variable[] VAR;
@@ -150,6 +153,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
         super(name, p);
         nVariables = problem.nVariables();
         var = new Variable[nVariables + 1];
+        wide = p.width() > 3;
 
         Arrays.setAll(var, Variable::new);
         lit = new Literal[2 * nVariables + 2];
@@ -236,6 +240,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
      * If a conflict is at any point, the propagation is abandoned early and false is
      * returned.
      */
+    @CheckReturnValue
     boolean propagate(Literal l) {
         int H = E;
         if (!takeAccountOf(l, false)) {
@@ -253,6 +258,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
     /**
      * Implements equation (62) of 7.2.2.2. Returns false if the next step is CONFLICT.
      */
+    @CheckReturnValue
     private boolean takeAccountOf(Literal l, boolean subordinate) {
         switch (fixity(l)) {
             case FIXED_T: return true;
@@ -299,6 +305,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
     /**
      * Implements steps L8 and L9 of Algorithm L. Returns false if the next step is CONFLICT.
      */
+    @CheckReturnValue
     boolean consider(Literal u, Literal v) {
         // if (log.isTraceEnabled()) log.trace("consider %d∨%d", dl(u), dl(v));
         // STEP L8: Consider u ∨ v
@@ -315,6 +322,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
     /**
      * STEP L9: update for a new binary clause u | v.
      */
+    @CheckReturnValue
     private boolean newBinaryClause(Literal u, Literal v) {
         ++BSTAMP;
         final Literal ubar = u.not, vbar = v.not;
@@ -343,6 +351,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
         return true;
     }
 
+    @CheckReturnValue
     private boolean addCompensationResolventsFrom(Literal u, Literal v) {
         for (int i = 0; i < v.BSIZE; ++i) {
             final Literal w = v.BIMP.get(i);
@@ -881,6 +890,10 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
             // X5 [Prepare to explore.]
 
             int Up = 0, jp = 0, j = 0;
+            // The following seems unnecessary according to experiment
+            if (wide) E = F;
+            // In the wide case: set fptr = rptr XXX
+
             BASE = 2;  // Knuth sets BASE = 0 in F6, but sets BASE = 2 in sat11.w
             Literal l = null, l0 = null;
             int xstate = 6;
@@ -918,7 +931,13 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
                         j = 0;
                         BASE += 2 * S;
                     }
-                    if (j == jp || j == 0 && BASE + 2 * S >= PT) return Result.LOOKAHEAD;
+                    if (j == jp || j == 0 && BASE + 2 * S >= PT) {
+                        if (wide) {
+                            T = NT;
+                            ResetFptr();
+                        }
+                        return Result.LOOKAHEAD;
+                    }
                     xstate = 6;
                     continue;
                 case 8: { // [Compute sharper heuristic.]
@@ -948,6 +967,16 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
                         // Generate the binary clause l0 | ~PARENT(l0)
                         appendToBimp(l0.not, l0.parent.not);
                         appendToBimp(l0.parent, l0);
+                        // In sat11.w, ll = l0.parent, looklit = l0, and he writes:
+                        //     oo,stamp[thevar(looklit)]=stamp[thevar(ll)]^((looklit^ll)&1);
+                        // but this is only done in the 3SAT case, because:
+                        //     We aren't allowed to upgrade the stamp value of |looklit| to
+                        //     the stamp value of |ll|, because that would violate an important
+                        //     invariant relation: Our mechanism for undoing virtual changes to large clauses
+                        //     requires that the literals in~|rstack| have monotonically decreasing
+                        //     levels of truth.
+                        if (!wide) l0.var.VAL = l0.parent.var.VAL ^ ((l0.id^l0.parent.id) & 1);
+                        // TODO: consider rewrite above to use functions instead of magic bit operations
                     }
                 case 10:  // [Optionally look deeper.]
                     if (useY) {
@@ -1011,8 +1040,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
                 for (int li = poslit(v).id; li <= neglit(v).id; ++li) {
                     final Literal l = lit[li];
                     // l is a free literal since v is a free variable.
-                    if (l.TSIZE > 0) return false;
-                    if (l.not.KSIZE > 0) return false;  // XXX: this should be delegated to the subclass (somehow).
+                    if (l.TSIZE > 0 || l.not.KSIZE > 0) return false;  // TODO: this is slightly unprincipled
                     List<Literal> bimpl = l.BIMP;
                     for (int j = 0; j < l.BSIZE; ++j) {
                         if (!isfixed(bimpl.get(j))) return false;
@@ -1133,6 +1161,6 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
     private Literal poslit(Variable v) { return lit[poslit(v.id)]; }
     private Literal neglit(Variable v) { return lit[neglit(v.id)]; }
     boolean isfree(Literal l) { return l.var.VAL < RT; }
-    private boolean isfixed(Literal l) { return l.var.VAL >= T; }
+    boolean isfixed(Literal l) { return l.var.VAL >= T; }
     String track() { return track.toString(); }
 }

@@ -14,10 +14,15 @@ import java.util.stream.Collectors;
 public class SATAlgorithmLX extends SATAlgorithmL {
     private static final Logger log = LogManager.getFormatterLogger();
     private static final float epsilon = 0.001f;
+    private static final float gamma = 0.2f;
     // The data structures CINX, CSIZE are used in the WIDE form (k-SAT where k > 3) of Algorithm L.
     private final List<List<SATAlgorithmL.Literal>> CINX = new ArrayList<>();
     private final TIntArrayList CSIZE = new TIntArrayList();
     private final float[] h;
+    private final int maxClause;
+    private final float[] clauseWeight;
+    private final Deque<Literal> bstack = new ArrayDeque<>();
+
 
 
     SATAlgorithmLX(SATProblem p) {
@@ -25,6 +30,10 @@ public class SATAlgorithmLX extends SATAlgorithmL {
         super("LX", p);
         addClauses();
         h = new float[2 * nVariables + 2];
+        maxClause = CSIZE.max();
+        clauseWeight = new float[maxClause];
+        clauseWeight[2] = 1f;
+        for (int k = 3; k < maxClause; ++k) clauseWeight[k] = clauseWeight[k-1] * gamma + 0.01f;
     }
 
     /**
@@ -190,14 +199,90 @@ public class SATAlgorithmLX extends SATAlgorithmL {
         return h;
     }
 
+    /* @ Windfalls and the weighted potentials for new binaries are discovered here,
+       as we ``virtually remove'' |bar(ll)| from the active clauses in which it
+       appears.
+
+       If all but one of the literals in such a clause has now been fixed false
+       at the current level, we put the remaining one on |bstack| for subsequent
+       analysis.
+
+       A conflict arises if all literals are fixed false. In such cases we set
+       |bptr=-1| instead of going immediately to |contra|; otherwise
+       backtracking would be more complicated. */
     @Override
     protected boolean Perform72(Literal l) {
+        // @ We've implicitly removed |bar(looklit)| from all of the active clauses.
+        // Now we must put it back, if its truth value was set at a lower level
+        // than~|cs|.
+        ResetFptr();
+        W.clear();
 
-        throw new IllegalStateException("not ready");
+
+        boolean contra = false;
+        bstack.clear();
+        if (tracing.contains(Trace.LOOKAHEAD)) log.trace(" (%s lookout)", l);
+        for (int i = 0; i < l.not.KSIZE; ++i) {
+            final int c = l.not.KINX.getQuick(i);
+            int s = CSIZE.get(c) - 1;
+            CSIZE.set(c, s);
+            if (s >= 2) w += clauseWeight[s];
+            else if (!contra) {
+                Literal u = null;
+                final List<Literal> clause = CINX.get(c);
+                // put the last remaining literal of c into bstack
+                int j = 0;
+                for (; j < clause.size(); ++j) {
+                    u = clause.get(j);
+                    Fixity fu = fixity(u);
+                    if (fu == Fixity.UNFIXED) break;
+                    if (fu == Fixity.FIXED_F) continue;;
+                    u = null;
+                    break;  // clause c is satisfied
+                }
+                if (j == clause.size()) {
+                    contra = true;
+                    if (tracing.contains(Trace.LOOKAHEAD)) log.trace("  looking %s-> [%d]", l, c);
+                } else if (u != null) {
+                    bstack.push(u);
+                    if (tracing.contains(Trace.LOOKAHEAD)) log.trace("  looking %s->%s [%d]", l, u, c);
+                }
+            }
+        }
+        if (contra) return false;
+        while (!bstack.isEmpty()) {
+            Literal u = bstack.pop();
+            if (fixity(u) == Fixity.FIXED_F) return false;
+            W.push(u);
+            if (!propagate(u)) return false;
+        }
+        return true;
     }
+
+
 
     @Override
     protected boolean Perform73(Literal l) {
         throw new IllegalStateException("not ready");
+    }
+
+    @Override
+    void ResetFptr() {
+        // Reset fptr by removing unfixed literals from rstack
+        while (E > F) {
+            final Literal u = R[E-1];
+            if (isfixed(u)) break;
+            --E;
+            if (tracing.contains(Trace.LOOKAHEAD)) log.trace(" (%s lookin)", u.not);
+            // unreduce all big clauses that contained bar(u) during lookahead
+            unreduceBigClausesContaining(u.not);
+        }
+    }
+
+    private void unreduceBigClausesContaining(Literal u) {
+        for (int i = u.KSIZE - 1; i >= 0; --i) {
+            final int c = u.KINX.getQuick(i);
+            CSIZE.set(c, CSIZE.get(c) + 1);
+        }
     }
 }

@@ -245,6 +245,16 @@ public class SATAlgorithmL3 extends SATAlgorithmL {
 
     @Override
     protected boolean Perform72(final Literal l) {
+        // @ A new breadth-first search is launched here, as we assert |looklit|
+        // at truth level~|cs| and derive the ramifications of that assertion.
+        //If, for example, |cs=50|, we will make |looklit| (and all other literals
+        //that it implies) true at level~50, unless they're already true at
+        //levels 52 or above.
+        //
+        //The consequences of |looklit| might include ``windfalls,'' which
+        //are unfixed literals that are the only survivors of a clause whose
+        //other literals have become false. Windfalls will be placed on the
+        //|wstack|, which is cleared here.
         w = 0;
         G = E = F;
         W.clear();
@@ -302,5 +312,6 @@ public class SATAlgorithmL3 extends SATAlgorithmL {
         return true;
     }
 
-
+    @Override
+    void ResetFptr() {}
 }
