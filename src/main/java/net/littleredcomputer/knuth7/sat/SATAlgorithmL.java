@@ -27,6 +27,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
     abstract boolean Perform72(Literal l);
     abstract boolean Perform73(Literal l);
     abstract void ResetFptr();  // TODO this is dodgy
+    abstract boolean wideClauses();  // True if we're using the wide clause storage format
 
     static class Variable implements Comparable<Variable> {
         Variable(int id) { this.id = id; }
@@ -94,7 +95,6 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
     final int nVariables;
     private final List<Literal> FORCE = new ArrayList<>();
     final Literal[] lit;
-    final boolean wide;  // true if there is a clause with more than 3 literals
     // TODO: add a comment explaining the difference between these and probably change the name of one of them.
     private final Variable[] var;
     final Variable[] VAR;
@@ -153,7 +153,6 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
         super(name, p);
         nVariables = problem.nVariables();
         var = new Variable[nVariables + 1];
-        wide = p.width() > 3;
 
         Arrays.setAll(var, Variable::new);
         lit = new Literal[2 * nVariables + 2];
@@ -891,8 +890,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
 
             int Up = 0, jp = 0, j = 0;
             // The following seems unnecessary according to experiment
-            if (wide) E = F;
-            // In the wide case: set fptr = rptr XXX
+            if (wideClauses()) G = F;
 
             BASE = 2;  // Knuth sets BASE = 0 in F6, but sets BASE = 2 in sat11.w
             Literal l = null, l0 = null;
@@ -932,7 +930,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
                         BASE += 2 * S;
                     }
                     if (j == jp || j == 0 && BASE + 2 * S >= PT) {
-                        if (wide) {
+                        if (wideClauses()) {
                             T = NT;
                             ResetFptr();
                         }
@@ -975,7 +973,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
                         //     invariant relation: Our mechanism for undoing virtual changes to large clauses
                         //     requires that the literals in~|rstack| have monotonically decreasing
                         //     levels of truth.
-                        if (!wide) l0.var.VAL = l0.parent.var.VAL ^ ((l0.id^l0.parent.id) & 1);
+                        if (!wideClauses()) l0.var.VAL = l0.parent.var.VAL ^ ((l0.id^l0.parent.id) & 1);
                         // TODO: consider rewrite above to use functions instead of magic bit operations
                     }
                 case 10:  // [Optionally look deeper.]
@@ -1019,6 +1017,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
 
         private boolean X12(Literal l) {
             FORCE.add(l);
+            log.trace("forcing %s", l);
             if (tracing.contains(Trace.FIXING)) log.trace("forcing %s (queue now contains %d)", l, FORCE.size());
             int oldT = T;
             T = PT;
@@ -1082,13 +1081,19 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
                 jhat = jhatp = 0;
                 // Warning: Knuth has it LBASE+T-BASE.
                 // also BASE=CS
-                E = F;
                 // CONFLICT = Y8
-                int oldT = T;
-                T = DT;
-                if (!propagate(l0)) throw new IllegalStateException("uh oh: initial propagate at level DT led to contra");
-                T = oldT; // is this necessary since we're about to enter state 3 XXX
-                Literal l = null;
+                Literal l;
+                if (wideClauses()) {
+                    l = l0;
+                    // update dlookahead structures for the consequences of l
+                } else {
+                    l = null;
+                    E = F;
+                    int oldT = T;
+                    T = DT;
+                    if (!propagate(l0)) throw new IllegalStateException("uh oh: initial propagate at level DT led to contra");
+                    T = oldT; // is this necessary since we're about to enter state 3 XXX
+                }
                 int ystate = 3;
                 // Y3. [Choose l for double look.]
                 while (true) switch (ystate) {
@@ -1124,6 +1129,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
                         BASE = LBASE;
                         T = DT;
                         τ = l0.H;
+                        ResetFptr();
                         l0.DFAIL = ISTAMP;
                         if (tracing.contains(Trace.LOOKAHEAD)) log.trace("y came back, now T is %d", T);
 

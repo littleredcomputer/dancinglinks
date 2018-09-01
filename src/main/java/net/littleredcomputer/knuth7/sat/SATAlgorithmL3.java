@@ -314,4 +314,7 @@ public class SATAlgorithmL3 extends SATAlgorithmL {
 
     @Override
     void ResetFptr() {}
+
+    @Override
+    boolean wideClauses() { return false; }
 }

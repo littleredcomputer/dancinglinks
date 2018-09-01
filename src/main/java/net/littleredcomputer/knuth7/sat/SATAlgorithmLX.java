@@ -19,10 +19,8 @@ public class SATAlgorithmLX extends SATAlgorithmL {
     private final List<List<SATAlgorithmL.Literal>> CINX = new ArrayList<>();
     private final TIntArrayList CSIZE = new TIntArrayList();
     private final float[] h;
-    private final int maxClause;
     private final float[] clauseWeight;
     private final Deque<Literal> bstack = new ArrayDeque<>();
-
 
 
     SATAlgorithmLX(SATProblem p) {
@@ -30,8 +28,8 @@ public class SATAlgorithmLX extends SATAlgorithmL {
         super("LX", p);
         addClauses();
         h = new float[2 * nVariables + 2];
-        maxClause = CSIZE.max();
-        clauseWeight = new float[maxClause];
+        final int maxClause = CSIZE.isEmpty() ? 0 : CSIZE.max();
+        clauseWeight = new float[Integer.max(3, maxClause+1)];
         clauseWeight[2] = 1f;
         for (int k = 3; k < maxClause; ++k) clauseWeight[k] = clauseWeight[k-1] * gamma + 0.01f;
     }
@@ -125,7 +123,8 @@ public class SATAlgorithmLX extends SATAlgorithmL {
             Pair<Literal, Literal> top = stack.pop();
             final Literal u = top.getKey(), v = top.getValue();
             if (tracing.contains(Trace.FIXING)) log.trace("  %s->%s|%s", L, u, v);
-            // makeParticipants(u.var, v.var);
+            makeParticipant(u.var);
+            makeParticipant(v.var);
             if (!consider(u, v)) return false;
         }
         return true;
@@ -217,8 +216,8 @@ public class SATAlgorithmLX extends SATAlgorithmL {
         // than~|cs|.
         ResetFptr();
         W.clear();
-
-
+        E = G;
+        if (!propagate(l)) return false;  // Perform (62).
         boolean contra = false;
         bstack.clear();
         if (tracing.contains(Trace.LOOKAHEAD)) log.trace(" (%s lookout)", l);
@@ -230,6 +229,8 @@ public class SATAlgorithmLX extends SATAlgorithmL {
             else if (!contra) {
                 Literal u = null;
                 final List<Literal> clause = CINX.get(c);
+                // The remaining literal may have become fixed, but not yet virtually removed
+                // (because it lies between G and E on the R stack).
                 // put the last remaining literal of c into bstack
                 int j = 0;
                 for (; j < clause.size(); ++j) {
@@ -263,16 +264,54 @@ public class SATAlgorithmLX extends SATAlgorithmL {
 
     @Override
     protected boolean Perform73(Literal l) {
-        throw new IllegalStateException("not ready");
+        ResetFptr();
+        E = G;
+        if (!propagate(l)) return false;
+        boolean contra = false;
+        while (G < E) {
+            Literal L = R[G];
+            ++G;
+
+            // Update dlookahead structures for the truth of L, but beware of contradictions
+            bstack.clear();
+            if (tracing.contains(Trace.LOOKAHEAD)) log.trace(" (%s dlookout)", L.not);
+            for (int i = 0; i < L.KSIZE; ++i) {
+                final int c = L.KINX.getQuick(i);
+                int ls = CSIZE.get(c) - 1;
+                CSIZE.set(c, ls);
+                if (ls < 2 && !contra) {
+                    // put the remaining doublelook literal of c into bstack
+                    List<Literal> clause = CINX.get(c);
+                    Literal u = null;
+                    int j = 0;
+                    for (; j < clause.size(); ++j) {
+                        u = clause.get(j);
+                        final Fixity fu = fixity(u);
+                        if (fu == Fixity.UNFIXED) break;
+                        if (fu == Fixity.FIXED_F) continue;
+                        u = null;
+                        break;  // c is satisfied
+                    }
+                    if (j == clause.size()) {
+                        contra = true;
+                        if (tracing.contains(Trace.LOOKAHEAD)) log.trace("  dlooking %s-> [%d]", L, c);
+                    } else if (u != null) {
+                        bstack.push(u);
+                        if (tracing.contains(Trace.LOOKAHEAD)) log.trace("  dlooking %s->%s [%d]", L, u, c);
+                    }
+                }
+            }
+        }
+        return true;
     }
 
     @Override
     void ResetFptr() {
         // Reset fptr by removing unfixed literals from rstack
-        while (E > F) {
-            final Literal u = R[E-1];
+        while (G > F) {
+            final Literal u = R[G-1];
             if (isfixed(u)) break;
-            --E;
+            --G;
             if (tracing.contains(Trace.LOOKAHEAD)) log.trace(" (%s lookin)", u.not);
             // unreduce all big clauses that contained bar(u) during lookahead
             unreduceBigClausesContaining(u.not);
@@ -282,7 +321,13 @@ public class SATAlgorithmLX extends SATAlgorithmL {
     private void unreduceBigClausesContaining(Literal u) {
         for (int i = u.KSIZE - 1; i >= 0; --i) {
             final int c = u.KINX.getQuick(i);
+            if (tracing.contains(Trace.LOOKAHEAD)) log.trace("Restoring %s to clause #%d", CINX.get(c).get(CSIZE.get(c)), c);
             CSIZE.set(c, CSIZE.get(c) + 1);
         }
+    }
+
+    @Override
+    boolean wideClauses() {
+        return true;
     }
 }
