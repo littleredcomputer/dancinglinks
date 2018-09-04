@@ -109,7 +109,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
     private final TIntStack ISTACKs = new TIntArrayStack();  // stack of BIMP table sizes for corresponding literals above
     private int T = NT;  // truth degree (F6 7.2.2.2 p. 37)
     int E = 0;  // literals R[k] are "nearly true" for G <= k < E.
-    int F = 0;
+    int F = 0;  // literals R[k] are "really true" for
     int G = 0;
     private long ISTAMP = 0;  // Knuth points out (sat11.w:1528) that this could conceivably overflow a 32-bit int
     private long BSTAMP = 0;  // stamp value of current candidate list in algorithm X
@@ -322,7 +322,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
      * STEP L9: update for a new binary clause u | v.
      */
     @CheckReturnValue
-    private boolean newBinaryClause(Literal u, Literal v) {
+    boolean newBinaryClause(Literal u, Literal v) {
         ++BSTAMP;
         final Literal ubar = u.not, vbar = v.not;
         ubar.bstamp = BSTAMP;
@@ -498,6 +498,7 @@ public abstract class SATAlgorithmL extends AbstractSATSolver {
                     FORCE.clear();
                     FORCE.add(l);
                 case 5:  // Accept near truths.
+                    // "Update data structures for all consequences of l, but goto conflict if a contradiction arises"
                     if (tracing.contains(Trace.STEP)) log.trace("Accepting near-truths of %s.", FORCE);
                     T = NT;
                     G = E = F;

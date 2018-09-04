@@ -108,6 +108,16 @@ public class SATAlgorithmLTest extends SATTestBase {
     // This one still takes a long time
     /* @Test */ public void rand3_2062_500_314_L() { assertUNSAT(SATProblem.randomInstance(3, 2062, 500, 314), L); }
 
+    @Test public void w_3_4_17_X() {
+        SATProblem p = SATProblem.waerden(3,4,17);
+        SATAlgorithmL a = new SATAlgorithmLX(p);
+        a.trackChoices = true;
+        a.tracing = EnumSet.allOf(SATAlgorithmL.Trace.class);
+        assertThat(a.solve().map(p::evaluate), isPresentAndIs(true));
+        assertThat(a.track(), is("[~9, 9, ~8, 8, null, null]"));
+    }
+
+
     @Test public void w_3_4_17() {
         SATProblem p = SATProblem.waerden(3,4,17);
         SATAlgorithmL a = new SATAlgorithmL3(p.to3SAT());

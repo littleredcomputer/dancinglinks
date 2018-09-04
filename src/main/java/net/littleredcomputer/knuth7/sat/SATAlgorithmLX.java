@@ -23,6 +23,7 @@ public class SATAlgorithmLX extends SATAlgorithmL {
     private final Deque<Literal> bstack = new ArrayDeque<>();
 
 
+
     SATAlgorithmLX(SATProblem p) {
         /* XXX put the name in here */
         super("LX", p);
@@ -55,15 +56,11 @@ public class SATAlgorithmLX extends SATAlgorithmL {
         log.trace("WIDE tables");
         for (int i = 0; i < CINX.size(); ++i) {
             final int n = CSIZE.getQuick(i);
-            if (n > 0) {
-                log.trace("CINX(%d) = %s", i, CINX.get(i).stream().limit(n).map(Literal::toString).collect(Collectors.joining(", ")));
-            }
+            if (n > 0) log.trace("CINX(%d) = %s", i, CINX.get(i).stream().limit(n).map(Literal::toString).collect(Collectors.joining(", ")));
         }
         for (int i = 2; i < 2*nVariables+2; ++i) {
             final Literal l = lit[i];
-            if (l.KSIZE > 0) {
-                log.trace("KINX(%s) = %s", l, l.KINX.subList(0, l.KSIZE));
-            }
+            if (l.KSIZE > 0) log.trace("KINX(%s) = %s", l, l.KINX.subList(0, l.KSIZE));
         }
     }
 
@@ -229,8 +226,6 @@ public class SATAlgorithmLX extends SATAlgorithmL {
             else if (!contra) {
                 Literal u = null;
                 final List<Literal> clause = CINX.get(c);
-                // The remaining literal may have become fixed, but not yet virtually removed
-                // (because it lies between G and E on the R stack).
                 // put the last remaining literal of c into bstack
                 int j = 0;
                 for (; j < clause.size(); ++j) {
@@ -305,6 +300,9 @@ public class SATAlgorithmLX extends SATAlgorithmL {
         return true;
     }
 
+    // where we left off: resetfptr() is never actually doing anything.
+    // we suspect because we have garbled E, F, and G somewhere.
+    
     @Override
     void ResetFptr() {
         // Reset fptr by removing unfixed literals from rstack
